@@ -28,7 +28,7 @@
 
 #define VERSION           "D4 2.1"
 
-#define DISPLAY_PRESENT        0  // set to 1 if the 20x4 I2C Display is present
+#define DISPLAY_PRESENT        1  // set to 1 if the 20x4 I2C Display is present
 
 //
 //  Board: Ardunio Uno
@@ -44,15 +44,14 @@
 #define PIN_MTR2_DIR_REV       8
 #define PIN_MTR1_PWM           9
 #define PIN_MTR2_PWM          10
-#define PIN_SONIC_PULSE       11
-#define PIN_SONIC_TRIGGER     12
 #define PIN_LED               13
 
 
 //************************* ADJUST THE FOLLOWING TO MATCH YOUR ROBOT ****************************
 
 #define ENCODER_COUNTS_PER_REV  540   // Set to the number of encoder pulses per wheel revolution
-#define MM_PER_REV              220   // Set to the number of mm per wheel revolution (Hence : Diameter * Pi)
+// Wheel diameter = 75mm
+#define MM_PER_REV              236   // Set to the number of mm per wheel revolution (Hence : Diameter * Pi)
 #define ENCODER_COUNTS_90_DEG   200   // Set to the number of encoder pulses to make a 90 degree turn
 #define SPEED_MIN               120    // Minimum speed (pulses/second) use at the end of individual moves
 
@@ -75,14 +74,11 @@ int flagLastMoveFwd;
 
 int flagLED;
 
-float sonicDistance;
-
 int printStep;
 int printLastCmd;
 unsigned long msTimerPrint;
 
 unsigned long msTimerMPU;
-unsigned long timerSonicRange;
 
 unsigned long timerPBStartOn;
 unsigned long timerPBStartOff;
@@ -523,22 +519,6 @@ void setMotorOutputs() {
   else                         digitalWrite(PIN_MTR2_DIR_REV, LOW); 
 }
 
-//======================================================================================
-// Trigger Sonic range finder
-void triggerRangeFinder() {
-    digitalWrite(PIN_SONIC_TRIGGER, LOW);
-    delayMicroseconds(20);
-    digitalWrite(PIN_SONIC_TRIGGER, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(PIN_SONIC_TRIGGER, LOW);
-    int pcount = pulseIn(PIN_SONIC_PULSE, HIGH);
-    sonicDistance = float(pcount) * 0.34 / 2.0;
-    //Serial.print(F("Sonic pcount = "));
-    //Serial.print(pcount);
-    //Serial.print(F("  mm = "));
-    //Serial.println(sonicDistance);
-}
-
 //=======================================================================================
 // Used to display fault codes on the built-in LED
 void faultCodeLED(int count) {
@@ -652,8 +632,7 @@ void updateDisplay() {
         break;
     case 3 :
         display.setCursor(4,2);
-        display.print(sonicDistance,1);
-        display.print("cm  ");
+        display.print("no sonic");
         break;
     case 4 :
         display.setCursor(6,3);
@@ -696,9 +675,6 @@ void setup() {
     display.print(F("Start Up....."));
   }
 
-  pinMode(PIN_SONIC_TRIGGER,OUTPUT);
-  pinMode(PIN_SONIC_PULSE,INPUT);
-
   pinMode(PIN_PB_START, INPUT_PULLUP);
 
   pinMode(PIN_MTR1_PWM,OUTPUT);
@@ -706,9 +682,6 @@ void setup() {
 
   pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
   pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
-
-  sonicDistance = 0.0;
-  timerSonicRange = 0;
 
   timerDelay = 0;
 
@@ -822,11 +795,6 @@ void loop() {
     case VEHICLE_START_WAIT :
       if (timerPBStartOn > 100000) {
         cmdQueue.next();
-      }
-      timerSonicRange += usecElapsed;
-      if (timerSonicRange > 1500000) {
-        timerSonicRange = 0;
-        triggerRangeFinder();
       }
       break;
     case VEHICLE_START :
