@@ -169,20 +169,20 @@ void loadCommandQueue()
     // Speed is encoder pulses per second.
     // There is a maximum speed.  Testing will be required to learn this speed.
     //    SETTING THE SPEEDS ABOVE THE MOTOR'S MAXIMUM SPEED WILL CAUSE STRANGE RESULTS
-    cmdQueue.add(VEHICLE_SET_MOVE_SPEED, 500); // Speed used for forward movements
-    cmdQueue.add(VEHICLE_SET_TURN_SPEED, 300); // Speed used for left or right turns
+    cmdQueue.add(VEHICLE_SET_MOVE_SPEED, 100); // Speed used for forward movements
+    cmdQueue.add(VEHICLE_SET_TURN_SPEED, 100); // Speed used for left or right turns
     cmdQueue.add(VEHICLE_SET_ACCEL, 400);      // smaller is softer   larger is quicker and less accurate moves
 
     // Example list of robot movements
     // This block is modified for each tournament
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
+    cmdQueue.add(VEHICLE_FORWARD, 2000);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
+    // cmdQueue.add(VEHICLE_FORWARD, 500);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
+    // cmdQueue.add(VEHICLE_FORWARD, 500);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
+    // cmdQueue.add(VEHICLE_FORWARD, 500);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
 
     // cmdQueue.add(VEHICLE_FORWARD,830);
     // cmdQueue.add(VEHICLE_TURN_LEFT);
@@ -681,8 +681,8 @@ void setup()
     flagLED = false;
 
     // Only uncomment one motor at a time to use the Serial Plotter function to tune the PID loop
-    // mtrLeft.debugOn();
-    // mtrRight.debugOn();
+    mtrLeft.debugOn();
+    mtrRight.debugOn();
 
     if (mtrLeft.debugState() || mtrRight.debugState()) {
         Serial.begin(115200);
