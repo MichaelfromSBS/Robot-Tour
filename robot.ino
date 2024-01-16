@@ -26,7 +26,7 @@
 #define ENCODER_COUNTS_PER_REV 540 // Set to the number of encoder pulses per wheel revolution
 // Wheel diameter = 75mm
 #define MM_PER_REV            236 // Set to the number of mm per wheel revolution (Hence : Diameter * Pi)
-#define ENCODER_COUNTS_90_DEG 200 // Set to the number of encoder pulses to make a 90 degree turn
+#define ENCODER_COUNTS_90_DEG 335 // Set to the number of encoder pulses to make a 90 degree turn
 #define SPEED_MIN             120 // Minimum speed (pulses/second) use at the end of individual moves
 
 LiquidCrystal_I2C display(0x27, 20, 4); // set the LCD address to 0x27 for a 20 chars and 4 line display
