@@ -1,15 +1,6 @@
-#include <LiquidCrystal_I2C.h> // this library is needed for the 20x4 display
+#include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 
-#define VERSION "D4 2.1"
-
-#define DISPLAY_PRESENT 1 // set to 1 if the 20x4 I2C Display is present
-
-//
-//  Board: Ardunio Uno
-//  DEFINE ALL I/O PIN CONNECTIONS
-//    *** DO NOT CHANGE ***
-//
 #define PIN_MTR1_ENCA    2
 #define PIN_MTR2_ENCA    3
 #define PIN_PB_START     4
@@ -21,15 +12,11 @@
 #define PIN_MTR2_PWM     10
 #define PIN_LED          13
 
-//************************* ADJUST THE FOLLOWING TO MATCH YOUR ROBOT ****************************
-
-#define ENCODER_COUNTS_PER_REV 540 // Set to the number of encoder pulses per wheel revolution
-// Wheel diameter = 75mm
-#define MM_PER_REV            236 // Set to the number of mm per wheel revolution (Hence : Diameter * Pi)
+#define PULSES_PER_MM         2.257
 #define ENCODER_COUNTS_90_DEG 315 // Set to the number of encoder pulses to make a 90 degree turn
 #define SPEED_MIN             120 // Minimum speed (pulses/second) use at the end of individual moves
 
-LiquidCrystal_I2C display(0x27, 20, 4); // set the LCD address to 0x27 for a 20 chars and 4 line display
+LiquidCrystal_I2C display { 0x27, 20, 4 };
 
 unsigned long usLast;
 long usecElapsed;
@@ -63,57 +50,27 @@ unsigned long timerDelay;
 //======================================================================================
 // Command object is used to hold a list of commands to be executed
 //======================================================================================
-class Command {
+class CommandQueue {
 private:
     int start;
     int end;
-    int last_cmd;
     int list[MAX_COMMANDS];
     int p1[MAX_COMMANDS];
     int flagFirstScan;
 
 public:
-    inline int current() { return list[start]; };
-    inline int getParameter1() { return p1[start]; };
-    inline int empty()
-    {
-        if (start == end)
-            return 127;
-        else
-            return 0;
-    };
-    inline int last() { return last_cmd; };
-    inline int firstScan()
+    int current() { return list[start]; }
+    int getParameter1() { return p1[start]; }
+    int empty() { return (start == end) ? 127 : 0; }
+
+    int firstScan()
     {
         int flag = flagFirstScan;
         flagFirstScan = 0;
         return flag;
     }
 
-    Command()
-    {
-        clear();
-    }
-
-    void clear()
-    {
-        start = 0;
-        end = 0;
-        last_cmd = 0;
-        flagFirstScan = 0;
-        int n = 0;
-        for (n = 0; n < MAX_COMMANDS; n++) {
-            list[n] = 0;
-            p1[n] = 0;
-        }
-    }
-
-    void add(int cmd)
-    {
-        add(cmd, 0);
-    }
-
-    void add(int cmd, int par1)
+    void add(int cmd, int par1 = 0)
     {
         list[end] = cmd;
         p1[end] = par1;
@@ -127,7 +84,6 @@ public:
         flagFirstScan = 127;
         if (empty())
             return 0;
-        last_cmd = list[start]; // save last command
         start++;
         if (start >= MAX_COMMANDS)
             start = 0;
@@ -135,7 +91,7 @@ public:
     }
 };
 
-Command cmdQueue;
+CommandQueue cmdQueue {};
 
 //
 //  List of possible vehicle motion commands
@@ -160,8 +116,7 @@ Command cmdQueue;
 //======================================================================================
 void loadCommandQueue()
 {
-
-    cmdQueue.clear();
+    cmdQueue = {};
     cmdQueue.add(VEHICLE_START_WAIT); // do not change this line - waits for start pushbutton
     cmdQueue.add(VEHICLE_START);      // do not change this line
 
@@ -184,32 +139,6 @@ void loadCommandQueue()
     cmdQueue.add(VEHICLE_FORWARD, 500);
     cmdQueue.add(VEHICLE_TURN_LEFT);
 
-    // cmdQueue.add(VEHICLE_FORWARD,830);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_FORWARD,500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_FORWARD,500);
-    // cmdQueue.add(VEHICLE_TURN_RIGHT);
-    // cmdQueue.add(VEHICLE_FORWARD,500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_FORWARD,1000);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_FORWARD,1000);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_FORWARD,1500);
-    // cmdQueue.add(VEHICLE_TURN_RIGHT);
-    // cmdQueue.add(VEHICLE_FORWARD,500);
-    // cmdQueue.add(VEHICLE_TURN_RIGHT);
-    // cmdQueue.add(VEHICLE_TURN_RIGHT);
-    // cmdQueue.add(VEHICLE_FORWARD,500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_FORWARD,500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // cmdQueue.add(VEHICLE_FORWARD,500);
-    // cmdQueue.add(VEHICLE_TURN_RIGHT);
-    // cmdQueue.add(VEHICLE_FORWARD,420);
-
     // This MUST be the last command.
     cmdQueue.add(VEHICLE_FINISHED);
 }
@@ -223,29 +152,6 @@ void loadCommandQueue()
 // Accel is encoder pulses per second^2
 //======================================================================================
 class MotionLogic {
-private:
-    long timeAccel;
-    long timeAtSpeed;
-    long timeDecel;
-
-    long timeRunning;
-    long timeRunningLast;
-    long timerUpdate;
-
-    int pinPWM;
-    int outputPWM;
-    int outputFwd;
-    int outputRev;
-
-    int running;
-    int flagStopped;
-    int counterStopped;
-
-    int pwmLoopI;
-    int pwmLoopP;
-
-    int debugPrint;
-
 public:
     long accelRate;
     long decelRate;
@@ -259,28 +165,16 @@ public:
 
     int speedAtDecel;
 
-    long countEncoder;
-    long countEncoderLast;
+    bool motorIsForward() { return isForward; }
 
-    inline int getOutputPWM() { return outputPWM; };
-    inline int getOutputFwd() { return outputFwd; };
-    inline int getOutputRev() { return outputRev; };
+    void incrEncoder() { ++countEncoder; }
 
-    inline void incrEncoder() { countEncoder++; };
-
-    inline void debugOn() { debugPrint = 1; }; // used this function to turn on debug print statements
-                                               // recommended to only turn on debug for left or right motor.  NOT both.
-    inline int debugState() { return debugPrint; };
+    void debugOn() { debugPrint = 1; } // used this function to turn on debug print statements
+                                       // recommended to only turn on debug for left or right motor.  NOT both.
+    int debugState() { return debugPrint; }
 
     MotionLogic()
     {
-        outputPWM = 0;
-        outputFwd = 0;
-        outputRev = 0;
-
-        countEncoder = 0;
-        countEncoderLast = 0;
-
         debugPrint = 0;
 
         accelRate = 200;
@@ -323,14 +217,7 @@ public:
     // This function must be called to start a motion
     void startMove(int pos, int spd)
     {
-
-        if (spd > 0) {
-            outputFwd = 1;
-            outputRev = 0;
-        } else {
-            outputFwd = 0;
-            outputRev = 1;
-        }
+        isForward = spd > 0;
 
         speedTarget = abs(spd);
         position = abs(pos);
@@ -381,9 +268,8 @@ public:
     void stop()
     {
         outputPWM = 0;
-        outputFwd = 0;
-        outputRev = 0;
-        analogWrite(pinPWM, outputPWM);
+        isForward = true;
+        analogWrite(pinPWM, 0);
         running = 0;
         posProfile = 0;
         speedProfile = 0;
@@ -411,8 +297,7 @@ public:
 
         if (running == 0) {
             outputPWM = 0;
-            outputFwd = 0;
-            outputRev = 0;
+            isForward = true;
             pwmLoopP = 0;
             pwmLoopI = 0;
             return;
@@ -498,44 +383,65 @@ public:
 
         analogWrite(pinPWM, outputPWM);
     }
+
+private:
+    long timeAccel;
+    long timeAtSpeed;
+    long timeDecel;
+
+    long timeRunning;
+    long timeRunningLast;
+    long timerUpdate;
+
+    int pinPWM;
+    int outputPWM = 0;
+    bool isForward = true;
+
+    int running;
+    int flagStopped;
+    int counterStopped;
+
+    int pwmLoopI;
+    int pwmLoopP;
+
+    int debugPrint;
+
+    long countEncoder = 0;
+    long countEncoderLast = 0;
 };
 
 MotionLogic mtrLeft;
 MotionLogic mtrRight;
 
-//---------------------------------------------------------------------------------------
 // Interupt function for counting left motor encoder pulses
 void encoderIntLeft()
 {
     mtrLeft.incrEncoder();
 }
 
-//---------------------------------------------------------------------------------------
 // Interupt function for counting right motor encoder pulses
 void encoderIntRight()
 {
     mtrRight.incrEncoder();
 }
 
-//---------------------------------------------------------------------------------------
-void setMotorOutputs()
+void setMotorDirection()
 {
-    if (mtrLeft.getOutputFwd())
+    if (mtrLeft.motorIsForward()) {
         digitalWrite(PIN_MTR1_DIR_FWD, HIGH);
-    else
-        digitalWrite(PIN_MTR1_DIR_FWD, LOW);
-    if (mtrLeft.getOutputRev())
-        digitalWrite(PIN_MTR1_DIR_REV, HIGH);
-    else
         digitalWrite(PIN_MTR1_DIR_REV, LOW);
-    if (mtrRight.getOutputFwd())
+    } else {
+        digitalWrite(PIN_MTR1_DIR_FWD, LOW);
+        digitalWrite(PIN_MTR1_DIR_REV, HIGH);
+    }
+
+    if (mtrRight.motorIsForward()) {
         digitalWrite(PIN_MTR2_DIR_FWD, HIGH);
-    else
-        digitalWrite(PIN_MTR2_DIR_FWD, LOW);
-    if (mtrRight.getOutputRev())
-        digitalWrite(PIN_MTR2_DIR_REV, HIGH);
-    else
         digitalWrite(PIN_MTR2_DIR_REV, LOW);
+    } else {
+        digitalWrite(PIN_MTR2_DIR_FWD, LOW);
+        digitalWrite(PIN_MTR2_DIR_REV, HIGH);
+    }
 }
 
 //=======================================================================================
@@ -676,7 +582,6 @@ void updateDisplay()
 //======================================================================================
 void setup()
 {
-
     pinMode(PIN_LED, OUTPUT);
     flagLED = false;
 
@@ -689,14 +594,12 @@ void setup()
         Serial.println(F("Setup()..."));
     }
 
-    if (DISPLAY_PRESENT) {
-        // Serial.println(F("Display init()"));
-        display.init();      // initialize the lcd
-        display.backlight(); // open the backlight
-        display.clear();
-        display.setCursor(0, 0);
-        display.print(F("Start Up....."));
-    }
+    // Serial.println(F("Display init()"));
+    display.init();      // initialize the lcd
+    display.backlight(); // open the backlight
+    display.clear();
+    display.setCursor(0, 0);
+    display.print(F("Start Up....."));
 
     pinMode(PIN_PB_START, INPUT_PULLUP);
 
@@ -729,9 +632,7 @@ void setup()
     mtrRight.setParams(speedAccel, speedMin, PIN_MTR2_PWM);
 
     // Serial.println(F("Initialize Display with background text"));
-    if (DISPLAY_PRESENT) {
-        initDisplay();
-    }
+    initDisplay();
     printStep = 0;
 
     loadCommandQueue();
@@ -783,9 +684,7 @@ void loop()
 
     // updates the display every 200000us or 0.2 seconds
     if (msTimerPrint > 200000) {
-        if (DISPLAY_PRESENT) {
-            updateDisplay();
-        }
+        updateDisplay();
         msTimerPrint = 0;
     }
     msTimerPrint += usecElapsed;
@@ -809,11 +708,11 @@ void loop()
 
     if (cmdQueue.current() > VEHICLE_START && cmdQueue.current() < VEHICLE_ABORT) {
         if (timerPBStartOn > 100000) {
-            cmdQueue.clear();
+            cmdQueue = {};
             cmdQueue.add(VEHICLE_ABORT);
             mtrLeft.stop();
             mtrRight.stop();
-            setMotorOutputs();
+            setMotorDirection();
         }
     }
 
@@ -836,15 +735,15 @@ void loop()
         break;
     case VEHICLE_FORWARD:
         if (newCmd) {
-            distance = ((long)cmdQueue.getParameter1() * (long)ENCODER_COUNTS_PER_REV / (long)MM_PER_REV);
+            distance = cmdQueue.getParameter1() * PULSES_PER_MM;
             speed = speedFwd;
             mtrLeft.startMove(distance, speed);
             mtrRight.startMove(distance, speed);
-            setMotorOutputs();
+            setMotorDirection();
         }
 
         if (mtrLeft.isStopped() && mtrRight.isStopped()) {
-            setMotorOutputs();
+            setMotorDirection();
             cmdQueue.next();
         }
         break;
@@ -854,11 +753,11 @@ void loop()
             speed = speedTurn;
             mtrLeft.startMove(distance, speed);
             mtrRight.startMove(distance, speed * -1);
-            setMotorOutputs();
+            setMotorDirection();
         }
 
         if (mtrLeft.isStopped() && mtrRight.isStopped()) {
-            setMotorOutputs();
+            setMotorDirection();
             cmdQueue.next();
         }
         break;
@@ -868,11 +767,11 @@ void loop()
             speed = speedTurn;
             mtrLeft.startMove(distance, speed * -1);
             mtrRight.startMove(distance, speed);
-            setMotorOutputs();
+            setMotorDirection();
         }
 
         if (mtrLeft.isStopped() && mtrRight.isStopped()) {
-            setMotorOutputs();
+            setMotorDirection();
             cmdQueue.next();
         }
         break;
@@ -894,14 +793,14 @@ void loop()
         if (newCmd) {
             mtrLeft.stop();
             mtrRight.stop();
-            setMotorOutputs();
+            setMotorDirection();
         }
         flagTimeRun = 0;
         break;
     case VEHICLE_ABORT:
         mtrLeft.stop();
         mtrRight.stop();
-        setMotorOutputs();
+        setMotorDirection();
         flagTimeRun = 0;
         if (timerPBStartOff > 200000) {
             loadCommandQueue();
