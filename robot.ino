@@ -153,51 +153,13 @@ void loadCommandQueue()
 //======================================================================================
 class MotionLogic {
 public:
-    long accelRate;
-    long decelRate;
-    long position;
-    long posProfile;
-
-    int speedTarget;
-    int speedProfile;
-    int speedActual;
-    int speedMinimum;
-
-    int speedAtDecel;
-
-    bool motorIsForward() { return isForward; }
+    bool isForward() { return forward; }
+    bool isStopped() { return stopped; }
 
     void incrEncoder() { ++countEncoder; }
 
-    void debugOn() { debugPrint = 1; } // used this function to turn on debug print statements
-                                       // recommended to only turn on debug for left or right motor.  NOT both.
-    int debugState() { return debugPrint; }
-
-    MotionLogic()
-    {
-        debugPrint = 0;
-
-        accelRate = 200;
-        decelRate = 200;
-
-        posProfile = 0;
-
-        speedActual = 0;
-        speedTarget = 0;
-        speedAtDecel = -10000;
-        timeRunning = 0;
-        timeRunningLast = 0;
-        flagStopped = 0;
-        counterStopped = 0;
-        running = 0;
-    }
-
-    int isStopped()
-    {
-        if (flagStopped)
-            return 1;
-        return 0;
-    }
+    void enableDebug() { debug = true; }
+    bool getDebug() { return debug; }
 
     void setParams(long accel, int spdMin, int pPWM)
     {
@@ -217,15 +179,15 @@ public:
     // This function must be called to start a motion
     void startMove(int pos, int spd)
     {
-        isForward = spd > 0;
+        forward = spd > 0;
 
         speedTarget = abs(spd);
         position = abs(pos);
-        if (debugPrint) {
+        if (debug) {
             Serial.print(F("Motion - speed       = "));
             Serial.println(speedTarget);
         }
-        if (debugPrint) {
+        if (debug) {
             Serial.print(F("Motion - position    = "));
             Serial.println(position);
         }
@@ -260,17 +222,17 @@ public:
         timeRunning = 0;
         timeRunningLast = 0;
         timerUpdate = 0;
-        flagStopped = 0;
+        stopped = false;
         counterStopped = 0;
-        running = 1;
+        running = true;
     }
 
     void stop()
     {
         outputPWM = 0;
-        isForward = true;
+        forward = true;
         analogWrite(pinPWM, 0);
-        running = 0;
+        running = false;
         posProfile = 0;
         speedProfile = 0;
         speedTarget = 0;
@@ -287,24 +249,24 @@ public:
             countEncoderLast = countEncoder;
             timerUpdate = 0;
             flagUpdate = 1;
-            if (running == 0 && speedActual < 4) {
-                if (!flagStopped)
-                    counterStopped++;
+            if (!running && speedActual < 4) {
+                if (!stopped)
+                    ++counterStopped;
                 if (counterStopped > 2)
-                    flagStopped = 1;
+                    stopped = true;
             }
         }
 
-        if (running == 0) {
+        if (!running) {
             outputPWM = 0;
-            isForward = true;
+            forward = true;
             pwmLoopP = 0;
             pwmLoopI = 0;
             return;
         }
 
         if (countEncoder >= (position - 2)) {
-            if (debugPrint) {
+            if (debug) {
                 Serial.print("STOPPED,");
                 Serial.print("timeRunning:");
                 Serial.print(timeRunning);
@@ -328,10 +290,10 @@ public:
         if (timeRunning < timeAtSpeed) {
             speed = (float)timeRunning / 1000000.0 * (float)accelRate;
             speedProfile = (int)speed;
-            // if (debugPrint) { Serial.print(" - Accel speedProfile = "); Serial.println(speedProfile); }
+            // if (debug) { Serial.print(" - Accel speedProfile = "); Serial.println(speedProfile); }
         } else if (timeRunning < timeDecel) {
             speedProfile = speedTarget;
-            // if (debugPrint) { Serial.print(" - At Speed speedProfile = "); Serial.println(speedProfile); }
+            // if (debug) { Serial.print(" - At Speed speedProfile = "); Serial.println(speedProfile); }
         } else {
             if (speedAtDecel <= -10000)
                 speedAtDecel = speedProfile;
@@ -339,7 +301,7 @@ public:
             speedProfile = speedAtDecel - (int)speed;
             if (speedProfile < speedMinimum)
                 speedProfile = speedMinimum;
-            // if (debugPrint) { Serial.print(" - Decel speedProfile = "); Serial.println(speedProfile); }
+            // if (debug) { Serial.print(" - Decel speedProfile = "); Serial.println(speedProfile); }
         }
 
         posProfile += (speedProfile * (timeRunning - timeRunningLast)) / 1000000;
@@ -360,7 +322,7 @@ public:
         if (outputPWM > 254)
             outputPWM = 254;
 
-        if (debugPrint) {
+        if (debug) {
             Serial.print("timeRunning:");
             Serial.print(timeRunning);
             Serial.print(",encoder:");
@@ -389,25 +351,36 @@ private:
     long timeAtSpeed;
     long timeDecel;
 
-    long timeRunning;
-    long timeRunningLast;
+    long timeRunning = 0;
+    long timeRunningLast = 0;
     long timerUpdate;
 
     int pinPWM;
     int outputPWM = 0;
-    bool isForward = true;
+    bool forward = true;
 
-    int running;
-    int flagStopped;
-    int counterStopped;
+    bool running = false;
+    bool stopped = false;
+    int counterStopped = 0;
 
     int pwmLoopI;
     int pwmLoopP;
 
-    int debugPrint;
+    bool debug = false;
 
     long countEncoder = 0;
     long countEncoderLast = 0;
+
+    long accelRate = 200;
+    long decelRate = 200;
+    long position = 0;
+    long posProfile = 0;
+
+    int speedTarget = 0;
+    int speedProfile = 0;
+    int speedActual = 0;
+    int speedMinimum = 0;
+    int speedAtDecel = -10000;
 };
 
 MotionLogic mtrLeft;
@@ -427,7 +400,7 @@ void encoderIntRight()
 
 void setMotorDirection()
 {
-    if (mtrLeft.motorIsForward()) {
+    if (mtrLeft.isForward()) {
         digitalWrite(PIN_MTR1_DIR_FWD, HIGH);
         digitalWrite(PIN_MTR1_DIR_REV, LOW);
     } else {
@@ -435,7 +408,7 @@ void setMotorDirection()
         digitalWrite(PIN_MTR1_DIR_REV, HIGH);
     }
 
-    if (mtrRight.motorIsForward()) {
+    if (mtrRight.isForward()) {
         digitalWrite(PIN_MTR2_DIR_FWD, HIGH);
         digitalWrite(PIN_MTR2_DIR_REV, LOW);
     } else {
@@ -586,10 +559,10 @@ void setup()
     flagLED = false;
 
     // Only uncomment one motor at a time to use the Serial Plotter function to tune the PID loop
-    // mtrLeft.debugOn();
-    // mtrRight.debugOn();
+    // mtrLeft.enableDebug();
+    // mtrRight.enableDebug();
 
-    if (mtrLeft.debugState() || mtrRight.debugState()) {
+    if (mtrLeft.getDebug() || mtrRight.getDebug()) {
         Serial.begin(115200);
         Serial.println(F("Setup()..."));
     }
