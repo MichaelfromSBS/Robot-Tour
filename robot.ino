@@ -1,5 +1,4 @@
 #include <LiquidCrystal_I2C.h>
-#include <Wire.h>
 
 #define PIN_MTR1_ENCA    2
 #define PIN_MTR2_ENCA    3
@@ -18,11 +17,6 @@
 LiquidCrystal_I2C display { 0x27, 20, 4 };
 
 unsigned long usLast = 0;
-unsigned long usScanLong = 0;
-int usLongResetCount = 0;
-unsigned long usScanAvg = 0;
-unsigned long timerusScan = 0;
-int scanCount = 0;
 
 unsigned long timerRunTime = 0;
 int speedFwd = 100;
@@ -45,18 +39,18 @@ private:
     int end;
     int list[MAX_COMMANDS];
     int p1[MAX_COMMANDS];
-    int flagFirstScan;
+    bool flagFirstScan = true;
 
 public:
     int current() { return list[start]; }
     int getParameter1() { return p1[start]; }
-    int empty() { return (start == end) ? 127 : 0; }
+    bool empty() { return start == end; }
 
-    int firstScan()
+    bool firstScan()
     {
-        int flag = flagFirstScan;
-        flagFirstScan = 0;
-        return flag;
+        auto save = flagFirstScan;
+        flagFirstScan = false;
+        return save;
     }
 
     void add(int cmd, int par1 = 0)
@@ -70,7 +64,7 @@ public:
 
     int next()
     {
-        flagFirstScan = 127;
+        flagFirstScan = true;
         if (empty())
             return 0;
         start++;
@@ -218,7 +212,7 @@ public:
 
         timerUpdate += usecElapsed;
         if (timerUpdate >= 30000) {
-            long delta = countEncoder - countEncoderLast;
+            auto delta = countEncoder - countEncoderLast;
             speedActual = delta * 1000000L / timerUpdate;
             countEncoderLast = countEncoder;
             timerUpdate = 0;
@@ -288,11 +282,7 @@ public:
         pwmLoopI += serror / 4;
         pwmLoopP = serror / 2;
 
-        auto outputPWM = pwmLoopP + pwmLoopI;
-        if (outputPWM < 0)
-            outputPWM = 0;
-        if (outputPWM > 254)
-            outputPWM = 254;
+        auto outputPWM = constrain(pwmLoopP + pwmLoopI, 0, 254);
 
         if (debug) {
             Serial.print("timeRunning:");
@@ -512,46 +502,22 @@ void setup()
 
 void loop()
 {
-    // this block calculates the number microseconds since this function's last execution
     auto current = micros();
     auto usecElapsed = current - usLast;
     usLast = current;
-    if (usecElapsed > usScanLong)
-        usScanLong = usecElapsed;
-    timerusScan += usecElapsed;
-    scanCount++;
-    if (timerusScan > 1000000) {
-        usScanAvg = timerusScan / scanCount;
-        timerusScan = 0;
-        scanCount = 0;
-        usLongResetCount++;
-        if (usLongResetCount > 10) {
-            usScanLong = 0;
-            usLongResetCount = 0;
-        }
-    }
 
-    // update motor speed and status
     mtrLeft.updateMotion(usecElapsed);
     mtrRight.updateMotion(usecElapsed);
 
-    // updates the display every 200000us or 0.2 seconds
     if (msTimerPrint > 200000) {
         updateDisplay();
         msTimerPrint = 0;
     }
     msTimerPrint += usecElapsed;
 
-    int newCmd = false;
-    if (cmdQueue.firstScan()) {
-        newCmd = true;
-        // Serial.print(F("New Vehicle Cmd = "));
-        // Serial.println(cmdQueue.current());
-    }
+    auto newCmd = cmdQueue.firstScan();
 
-    int pbStart = !digitalRead(PIN_PB_START);
-
-    if (pbStart) {
+    if (!digitalRead(PIN_PB_START)) {
         timerPBStartOn += usecElapsed;
         timerPBStartOff = 0;
     } else {
