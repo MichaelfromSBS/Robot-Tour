@@ -10,7 +10,6 @@
 #define PIN_MTR2_DIR_REV 8
 #define PIN_MTR1_PWM     9
 #define PIN_MTR2_PWM     10
-#define PIN_LED          13
 
 #define PULSES_PER_MM         2.257
 #define ENCODER_COUNTS_90_DEG 315 // Set to the number of encoder pulses to make a 90 degree turn
@@ -32,10 +31,7 @@ int speedTurn;
 int flagTimeRun;
 int flagLastMoveFwd;
 
-int flagLED;
-
 int printStep;
-int printLastCmd;
 unsigned long msTimerPrint;
 
 unsigned long msTimerMPU;
@@ -93,10 +89,6 @@ public:
 
 CommandQueue cmdQueue {};
 
-//
-//  List of possible vehicle motion commands
-//   -- Additional motion commands can be added which will require code to execute
-//
 #define VEHICLE_START_WAIT     1 // Wait for the start button to be pressed
 #define VEHICLE_START          2 // First motion command after button press
 #define VEHICLE_FORWARD        10
@@ -105,15 +97,9 @@ CommandQueue cmdQueue {};
 #define VEHICLE_SET_MOVE_SPEED 101
 #define VEHICLE_SET_TURN_SPEED 102
 #define VEHICLE_SET_ACCEL      105
-#define VEHICLE_FINISHED       900 // Must be at the end of the command list
-#define VEHICLE_STOP           1000
+#define VEHICLE_FINISHED       900  // Must be at the end of the command list
 #define VEHICLE_ABORT          2000 // Used to abort the current movement list and stop the robot
 
-//======================================================================================
-//======================================================================================
-// Loads the command queue with the robots commands to be executed during a run
-//======================================================================================
-//======================================================================================
 void loadCommandQueue()
 {
     cmdQueue = {};
@@ -169,14 +155,12 @@ public:
         pinPWM = pPWM;
     }
 
-    // This object uses the same value for accelerate and decelerate rate
     void setAccel(long accel)
     {
         accelRate = accel;
         decelRate = accel;
     }
 
-    // This function must be called to start a motion
     void startMove(int pos, int spd)
     {
         forward = spd > 0;
@@ -347,13 +331,13 @@ public:
     }
 
 private:
-    long timeAccel;
-    long timeAtSpeed;
-    long timeDecel;
+    long timeAccel = 0;
+    long timeAtSpeed = 0;
+    long timeDecel = 0;
 
     long timeRunning = 0;
     long timeRunningLast = 0;
-    long timerUpdate;
+    long timerUpdate = 0;
 
     int pinPWM;
     int outputPWM = 0;
@@ -363,8 +347,8 @@ private:
     bool stopped = false;
     int counterStopped = 0;
 
-    int pwmLoopI;
-    int pwmLoopP;
+    int pwmLoopI = 0;
+    int pwmLoopP = 0;
 
     bool debug = false;
 
@@ -417,55 +401,8 @@ void setMotorDirection()
     }
 }
 
-//=======================================================================================
-// Used to display fault codes on the built-in LED
-void faultCodeLED(int count)
-{
-    int i = -1;
-    flagLED = true;
-    toggleLED();
-    while (-1) {
-        i = count;
-        delay(2000);
-
-        while (i > 0) {
-            toggleLED();
-            delay(300);
-            toggleLED();
-            delay(300);
-            i--;
-        }
-    }
-}
-
-//=======================================================================================
-// Toggle the Ardunio built in LED each time this function is executed
-void toggleLED()
-{
-    if (flagLED) {
-        digitalWrite(PIN_LED, LOW);
-        flagLED = false;
-    } else {
-        digitalWrite(PIN_LED, HIGH);
-        flagLED = true;
-    }
-}
-
-//=======================================================================================
-//  This function is called to update the variable information on the display.
-//  Only limited information is updated at a time since the write commands are slow
-//=======================================================================================
 void initDisplay()
 {
-
-    // Display is 20 characters wide by 4 lines
-
-    // 01234567890123456789
-    // Cmd:
-    //
-    // Rng: xxxx.x cm
-    // Time: xx.xxx  v.v.vv
-
     display.clear();
     display.setCursor(0, 0);
     display.print(F("Cmd:"));
@@ -477,26 +414,17 @@ void initDisplay()
     display.print(F("Time:"));
 }
 
-//=======================================================================================
-//  This function is called to update the variable information on the display.
-//  Only limited information is updated at a time since the write commands are slow
-//=======================================================================================
 void updateDisplay()
 {
-    int cmd;
-    char buff[12];
-    int i;
-    int itmp;
-    float f;
+    static int lastCmd;
 
     switch (printStep) {
-    case 0:
-        cmd = cmdQueue.current();
-        if (printLastCmd != cmd) {
+    case 0: {
+        auto cmd = cmdQueue.current();
+        if (lastCmd != cmd) {
             display.setCursor(4, 0);
             switch (cmd) {
             case VEHICLE_START_WAIT:
-                // 4567890123456789
                 display.print(F("WAIT START     "));
                 break;
             case VEHICLE_START:
@@ -514,9 +442,6 @@ void updateDisplay()
             case VEHICLE_FINISHED:
                 display.print(F("FINISHED       "));
                 break;
-            case VEHICLE_STOP:
-                display.print(F("STOP           "));
-                break;
             case VEHICLE_ABORT:
                 display.print(F("ABORT          "));
                 break;
@@ -524,40 +449,33 @@ void updateDisplay()
                 display.print(F("***unknown**"));
                 break;
             }
-            printLastCmd = cmd;
+            lastCmd = cmd;
         }
         break;
+    }
     case 1:
-        break;
     case 2:
         break;
     case 3:
         display.setCursor(4, 2);
         display.print("no sonic");
         break;
-    case 4:
+    case 4: {
         display.setCursor(6, 3);
-        f = (float)timerRunTime / 1000000.0;
-        display.print(f, 3);
-        break;
-    default:
-        printStep = -1;
+        auto time = (float)timerRunTime / 1000000.0;
+        display.print(time, 3);
         break;
     }
+    default:
+        printStep = 0;
+        return;
+    }
 
-    printStep++; // increment the print step value to the next sequence step
-
-    toggleLED();
+    ++printStep;
 }
 
-//======================================================================================
-// The setup() is called once at the power up of the Arduino
-//======================================================================================
 void setup()
 {
-    pinMode(PIN_LED, OUTPUT);
-    flagLED = false;
-
     // Only uncomment one motor at a time to use the Serial Plotter function to tune the PID loop
     // mtrLeft.enableDebug();
     // mtrRight.enableDebug();
@@ -604,7 +522,6 @@ void setup()
     mtrLeft.setParams(speedAccel, speedMin, PIN_MTR1_PWM);
     mtrRight.setParams(speedAccel, speedMin, PIN_MTR2_PWM);
 
-    // Serial.println(F("Initialize Display with background text"));
     initDisplay();
     printStep = 0;
 
@@ -614,15 +531,10 @@ void setup()
     timerusScan = 0;
     scanCount = 0;
     usLongResetCount = 0;
-    // Serial.println(F("....End Setup"));
 
     usLast = micros();
 }
 
-//======================================================================================
-// The following function will execute then exit.  The Ardunio will constantly call this
-// function.  The function should not have delays as this will effect the motor's speed.
-//======================================================================================
 void loop()
 {
     long distance;
@@ -694,9 +606,8 @@ void loop()
 
     switch (cmdQueue.current()) {
     case VEHICLE_START_WAIT:
-        if (timerPBStartOn > 100000) {
+        if (timerPBStartOn > 100000)
             cmdQueue.next();
-        }
         break;
     case VEHICLE_START:
         timerRunTime = 0;
@@ -761,8 +672,8 @@ void loop()
         mtrRight.setAccel(cmdQueue.getParameter1());
         cmdQueue.next();
         break;
-    default:
     case VEHICLE_FINISHED:
+    default:
         if (newCmd) {
             mtrLeft.stop();
             mtrRight.stop();
