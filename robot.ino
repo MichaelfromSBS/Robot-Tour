@@ -17,29 +17,22 @@
 
 LiquidCrystal_I2C display { 0x27, 20, 4 };
 
-unsigned long usLast;
-long usecElapsed;
-long usScanLong;
-int usLongResetCount;
-long usScanAvg;
-long timerusScan;
-int scanCount;
+unsigned long usLast = 0;
+unsigned long usScanLong = 0;
+int usLongResetCount = 0;
+unsigned long usScanAvg = 0;
+unsigned long timerusScan = 0;
+int scanCount = 0;
 
-long timerRunTime;
-int speedFwd;
-int speedTurn;
-int flagTimeRun;
-int flagLastMoveFwd;
+unsigned long timerRunTime = 0;
+int speedFwd = 100;
+int speedTurn = 100;
+bool flagTimeRun = false;
 
-int printStep;
-unsigned long msTimerPrint;
+unsigned long msTimerPrint = 0;
 
-unsigned long msTimerMPU;
-
-unsigned long timerPBStartOn;
-unsigned long timerPBStartOff;
-
-unsigned long timerDelay;
+unsigned long timerPBStartOn = 0;
+unsigned long timerPBStartOff = 0;
 
 #define MAX_COMMANDS 60 // Maximum number of motion commands allowed
 
@@ -166,25 +159,23 @@ public:
         forward = spd > 0;
 
         speedTarget = abs(spd);
-        position = abs(pos);
+        positionTarget = abs(pos);
         if (debug) {
             Serial.print(F("Motion - speed       = "));
             Serial.println(speedTarget);
-        }
-        if (debug) {
             Serial.print(F("Motion - position    = "));
-            Serial.println(position);
+            Serial.println(positionTarget);
         }
 
         float tAccel = (float)speedTarget / (float)accelRate;
         float tDecel = (float)speedTarget / (float)decelRate;
         float distAccel = (float)speedTarget / 2.0 * tAccel;
         float distDecel = (float)speedTarget / 2.0 * tDecel;
-        float distAtSpeed = (float)position - distAccel - distDecel;
+        float distAtSpeed = (float)positionTarget - distAccel - distDecel;
         if (distAtSpeed < 0.0) { // current written as accel and decel same
             // Serial.println("Motion - Short move logic");
-            distAccel = (float)position / 2.0;
-            distDecel = (float)position / 2.0;
+            distAccel = (float)positionTarget / 2.0;
+            distDecel = (float)positionTarget / 2.0;
             distAtSpeed = 0.0;
 
             tAccel = sqrt(distAccel * 2.0 / (float)accelRate);
@@ -193,7 +184,6 @@ public:
         float tAtSpeed = distAtSpeed / (float)speedTarget;
 
         // times are in microseconds
-        timeAccel = 0;
         timeAtSpeed = tAccel * 1000000;
         timeDecel = timeAtSpeed + tAtSpeed * 1000000;
 
@@ -213,7 +203,6 @@ public:
 
     void stop()
     {
-        outputPWM = 0;
         forward = true;
         analogWrite(pinPWM, 0);
         running = false;
@@ -225,6 +214,7 @@ public:
     void updateMotion(long usecElapsed)
     {
         int flagUpdate = 0;
+        int speedActual;
 
         timerUpdate += usecElapsed;
         if (timerUpdate >= 30000) {
@@ -242,14 +232,13 @@ public:
         }
 
         if (!running) {
-            outputPWM = 0;
             forward = true;
             pwmLoopP = 0;
             pwmLoopI = 0;
             return;
         }
 
-        if (countEncoder >= (position - 2)) {
+        if (countEncoder >= (positionTarget - 2)) {
             if (debug) {
                 Serial.print("STOPPED,");
                 Serial.print("timeRunning:");
@@ -259,7 +248,6 @@ public:
                 Serial.print(",speedActual:");
                 Serial.print(speedActual);
                 Serial.print(",pwm:");
-                Serial.println(outputPWM);
             }
 
             stop();
@@ -300,7 +288,7 @@ public:
         pwmLoopI += serror / 4;
         pwmLoopP = serror / 2;
 
-        outputPWM = pwmLoopP + pwmLoopI;
+        auto outputPWM = pwmLoopP + pwmLoopI;
         if (outputPWM < 0)
             outputPWM = 0;
         if (outputPWM > 254)
@@ -331,7 +319,6 @@ public:
     }
 
 private:
-    long timeAccel = 0;
     long timeAtSpeed = 0;
     long timeDecel = 0;
 
@@ -340,7 +327,6 @@ private:
     long timerUpdate = 0;
 
     int pinPWM;
-    int outputPWM = 0;
     bool forward = true;
 
     bool running = false;
@@ -357,12 +343,11 @@ private:
 
     long accelRate = 200;
     long decelRate = 200;
-    long position = 0;
     long posProfile = 0;
 
+    long positionTarget = 0;
     int speedTarget = 0;
     int speedProfile = 0;
-    int speedActual = 0;
     int speedMinimum = 0;
     int speedAtDecel = -10000;
 };
@@ -416,7 +401,8 @@ void initDisplay()
 
 void updateDisplay()
 {
-    static int lastCmd;
+    static int lastCmd = 0;
+    static int printStep = 0;
 
     switch (printStep) {
     case 0: {
@@ -500,8 +486,6 @@ void setup()
     pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
     pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
 
-    timerDelay = 0;
-
     attachInterrupt(digitalPinToInterrupt(PIN_MTR1_ENCA), encoderIntLeft, RISING);
     attachInterrupt(digitalPinToInterrupt(PIN_MTR2_ENCA), encoderIntRight, RISING);
 
@@ -514,39 +498,23 @@ void setup()
     digitalWrite(PIN_MTR2_DIR_FWD, LOW);
     digitalWrite(PIN_MTR2_DIR_REV, LOW);
 
-    speedFwd = 100;
-    speedTurn = 100;
-
     int speedAccel = 100;
     int speedMin = SPEED_MIN;
     mtrLeft.setParams(speedAccel, speedMin, PIN_MTR1_PWM);
     mtrRight.setParams(speedAccel, speedMin, PIN_MTR2_PWM);
 
     initDisplay();
-    printStep = 0;
 
     loadCommandQueue();
-    usScanLong = 0;
-    usScanAvg = 0;
-    timerusScan = 0;
-    scanCount = 0;
-    usLongResetCount = 0;
 
     usLast = micros();
 }
 
 void loop()
 {
-    long distance;
-    int speed;
-    float fspd;
-    long ldelta;
-    long delayWait;
-    int itmp;
-
     // this block calculates the number microseconds since this function's last execution
-    unsigned long current = micros();
-    usecElapsed = current - usLast;
+    auto current = micros();
+    auto usecElapsed = current - usLast;
     usLast = current;
     if (usecElapsed > usScanLong)
         usScanLong = usecElapsed;
@@ -613,16 +581,14 @@ void loop()
         timerRunTime = 0;
         if (timerPBStartOff > 100000) {
             cmdQueue.next();
-            flagTimeRun = 1;
-            flagLastMoveFwd = 0;
+            flagTimeRun = true;
         }
         break;
     case VEHICLE_FORWARD:
         if (newCmd) {
-            distance = cmdQueue.getParameter1() * PULSES_PER_MM;
-            speed = speedFwd;
-            mtrLeft.startMove(distance, speed);
-            mtrRight.startMove(distance, speed);
+            long distance = cmdQueue.getParameter1() * PULSES_PER_MM;
+            mtrLeft.startMove(distance, speedFwd);
+            mtrRight.startMove(distance, speedFwd);
             setMotorDirection();
         }
 
@@ -633,10 +599,8 @@ void loop()
         break;
     case VEHICLE_TURN_RIGHT:
         if (newCmd) {
-            distance = ENCODER_COUNTS_90_DEG;
-            speed = speedTurn;
-            mtrLeft.startMove(distance, speed);
-            mtrRight.startMove(distance, speed * -1);
+            mtrLeft.startMove(ENCODER_COUNTS_90_DEG, speedTurn);
+            mtrRight.startMove(ENCODER_COUNTS_90_DEG, -speedTurn);
             setMotorDirection();
         }
 
@@ -647,10 +611,8 @@ void loop()
         break;
     case VEHICLE_TURN_LEFT:
         if (newCmd) {
-            distance = ENCODER_COUNTS_90_DEG;
-            speed = speedTurn;
-            mtrLeft.startMove(distance, speed * -1);
-            mtrRight.startMove(distance, speed);
+            mtrLeft.startMove(ENCODER_COUNTS_90_DEG, -speedTurn);
+            mtrRight.startMove(ENCODER_COUNTS_90_DEG, speedTurn);
             setMotorDirection();
         }
 
@@ -679,13 +641,13 @@ void loop()
             mtrRight.stop();
             setMotorDirection();
         }
-        flagTimeRun = 0;
+        flagTimeRun = false;
         break;
     case VEHICLE_ABORT:
         mtrLeft.stop();
         mtrRight.stop();
         setMotorDirection();
-        flagTimeRun = 0;
+        flagTimeRun = false;
         if (timerPBStartOff > 200000) {
             loadCommandQueue();
         }
