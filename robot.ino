@@ -11,7 +11,7 @@
 #define PIN_MTR2_PWM     10
 
 #define PULSES_PER_MM         2.257
-#define ENCODER_COUNTS_90_DEG 315 // Set to the number of encoder pulses to make a 90 degree turn
+#define ENCODER_COUNTS_90_DEG 314 // Set to the number of encoder pulses to make a 90 degree turn
 #define SPEED_MIN             120 // Minimum speed (pulses/second) use at the end of individual moves
 
 LiquidCrystal_I2C display { 0x27, 20, 4 };
