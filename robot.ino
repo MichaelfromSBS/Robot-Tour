@@ -21,7 +21,7 @@ unsigned long usLast = 0;
 unsigned long timerRunTime = 0;
 int speedFwd = 100;
 int speedTurn = 100;
-bool flagTimeRun = false;
+bool timerRunning = false;
 
 unsigned long msTimerPrint = 0;
 
@@ -43,8 +43,8 @@ public:
 
     bool firstScan()
     {
-        auto saved = firstScan;
-        firstScan = false;
+        auto saved = isFirstScan;
+        isFirstScan = false;
         return saved;
     }
 
@@ -57,7 +57,7 @@ public:
 
     void next()
     {
-        firstScan = true;
+        isFirstScan = true;
         if (start == end)
             return;
         ++start;
@@ -73,7 +73,7 @@ private:
     Command list[MAX_COMMANDS];
     size_t start = 0;
     size_t end = 0;
-    bool firstScan = true;
+    bool isFirstScan = true;
 };
 
 CommandQueue cmdQueue;
@@ -344,18 +344,6 @@ private:
 MotionLogic mtrLeft { PIN_MTR1_PWM };
 MotionLogic mtrRight { PIN_MTR2_PWM };
 
-// Interupt function for counting left motor encoder pulses
-void encoderIntLeft()
-{
-    mtrLeft.incrEncoder();
-}
-
-// Interupt function for counting right motor encoder pulses
-void encoderIntRight()
-{
-    mtrRight.incrEncoder();
-}
-
 void setMotorDirection()
 {
     if (mtrLeft.isForward()) {
@@ -375,7 +363,7 @@ void setMotorDirection()
     }
 }
 
-void initPorts()
+void initPins()
 {
     pinMode(PIN_PB_START, INPUT_PULLUP);
 
@@ -385,8 +373,11 @@ void initPorts()
     pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
     pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
 
-    attachInterrupt(digitalPinToInterrupt(PIN_MTR1_ENCA), encoderIntLeft, RISING);
-    attachInterrupt(digitalPinToInterrupt(PIN_MTR2_ENCA), encoderIntRight, RISING);
+    attachInterrupt(
+        digitalPinToInterrupt(PIN_MTR1_ENCA), [] { mtrLeft.incrEncoder(); }, RISING);
+
+    attachInterrupt(
+        digitalPinToInterrupt(PIN_MTR2_ENCA), [] { mtrRight.incrEncoder(); }, RISING);
 
     pinMode(PIN_MTR1_DIR_FWD, OUTPUT);
     pinMode(PIN_MTR1_DIR_REV, OUTPUT);
@@ -476,6 +467,8 @@ void setup()
         Serial.println(F("Setup()..."));
     }
 
+    initPins();
+
     // Serial.println(F("Display init()"));
     display.init();      // initialize the lcd
     display.backlight(); // open the backlight
@@ -523,7 +516,7 @@ void loop()
         }
     }
 
-    if (flagTimeRun)
+    if (timerRunning)
         timerRunTime += usecElapsed;
 
     switch (cmdQueue.currentCmd()) {
@@ -534,7 +527,7 @@ void loop()
     case VEHICLE_START:
         if (timerPBStartOff > 100000) {
             cmdQueue.next();
-            flagTimeRun = true;
+            timerRunning = true;
             timerRunTime = 0;
         }
         break;
@@ -594,14 +587,14 @@ void loop()
             mtrLeft.stop();
             mtrRight.stop();
             setMotorDirection();
-            flagTimeRun = false;
+            timerRunning = false;
         }
         break;
     case VEHICLE_ABORT:
         mtrLeft.stop();
         mtrRight.stop();
         setMotorDirection();
-        flagTimeRun = false;
+        timerRunning = false;
         if (timerPBStartOff > 200000)
             loadCommandQueue();
         break;
