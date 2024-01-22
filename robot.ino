@@ -30,51 +30,53 @@ unsigned long timerPBStartOff = 0;
 
 #define MAX_COMMANDS 60 // Maximum number of motion commands allowed
 
-//======================================================================================
-// Command object is used to hold a list of commands to be executed
-//======================================================================================
 class CommandQueue {
-private:
-    int start;
-    int end;
-    int list[MAX_COMMANDS];
-    int p1[MAX_COMMANDS];
-    bool flagFirstScan = true;
-
 public:
-    int current() { return list[start]; }
-    int getParameter1() { return p1[start]; }
+    struct Command {
+        int cmd;
+        int param;
+    };
+
+    int currentCmd() { return list[start].cmd; }
+    int currentParam() { return list[start].param; }
     bool empty() { return start == end; }
 
     bool firstScan()
     {
-        auto save = flagFirstScan;
-        flagFirstScan = false;
-        return save;
+        auto saved = firstScan;
+        firstScan = false;
+        return saved;
     }
 
-    void add(int cmd, int par1 = 0)
+    void add(int cmd, int param = 0)
     {
-        list[end] = cmd;
-        p1[end] = par1;
-        end++;
         if (end >= MAX_COMMANDS)
-            end = 0;
+            return;
+        list[end++] = { cmd, param };
     }
 
-    int next()
+    void next()
     {
-        flagFirstScan = true;
-        if (empty())
-            return 0;
-        start++;
-        if (start >= MAX_COMMANDS)
-            start = 0;
-        return list[start];
+        firstScan = true;
+        if (start == end)
+            return;
+        ++start;
     }
+
+    void clear()
+    {
+        start = 0;
+        end = 0;
+    }
+
+private:
+    Command list[MAX_COMMANDS];
+    size_t start = 0;
+    size_t end = 0;
+    bool firstScan = true;
 };
 
-CommandQueue cmdQueue {};
+CommandQueue cmdQueue;
 
 #define VEHICLE_START_WAIT     1 // Wait for the start button to be pressed
 #define VEHICLE_START          2 // First motion command after button press
@@ -89,7 +91,7 @@ CommandQueue cmdQueue {};
 
 void loadCommandQueue()
 {
-    cmdQueue = {};
+    cmdQueue.clear();
     cmdQueue.add(VEHICLE_START_WAIT); // do not change this line - waits for start pushbutton
     cmdQueue.add(VEHICLE_START);      // do not change this line
 
@@ -126,6 +128,11 @@ void loadCommandQueue()
 //======================================================================================
 class MotionLogic {
 public:
+    explicit MotionLogic(int pwmPin)
+        : pinPWM { pwmPin }
+    {
+    }
+
     bool isForward() { return forward; }
     bool isStopped() { return stopped; }
 
@@ -133,14 +140,6 @@ public:
 
     void enableDebug() { debug = true; }
     bool getDebug() { return debug; }
-
-    void setParams(long accel, int spdMin, int pPWM)
-    {
-        accelRate = accel;
-        decelRate = accel;
-        speedMinimum = spdMin;
-        pinPWM = pPWM;
-    }
 
     void setAccel(long accel)
     {
@@ -331,19 +330,19 @@ private:
     long countEncoder = 0;
     long countEncoderLast = 0;
 
-    long accelRate = 200;
-    long decelRate = 200;
+    long accelRate = 100;
+    long decelRate = 100;
     long posProfile = 0;
 
     long positionTarget = 0;
     int speedTarget = 0;
     int speedProfile = 0;
-    int speedMinimum = 0;
+    int speedMinimum = SPEED_MIN;
     int speedAtDecel = -10000;
 };
 
-MotionLogic mtrLeft;
-MotionLogic mtrRight;
+MotionLogic mtrLeft { PIN_MTR1_PWM };
+MotionLogic mtrRight { PIN_MTR2_PWM };
 
 // Interupt function for counting left motor encoder pulses
 void encoderIntLeft()
@@ -376,14 +375,34 @@ void setMotorDirection()
     }
 }
 
+void initPorts()
+{
+    pinMode(PIN_PB_START, INPUT_PULLUP);
+
+    pinMode(PIN_MTR1_PWM, OUTPUT);
+    pinMode(PIN_MTR2_PWM, OUTPUT);
+
+    pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
+    pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
+
+    attachInterrupt(digitalPinToInterrupt(PIN_MTR1_ENCA), encoderIntLeft, RISING);
+    attachInterrupt(digitalPinToInterrupt(PIN_MTR2_ENCA), encoderIntRight, RISING);
+
+    pinMode(PIN_MTR1_DIR_FWD, OUTPUT);
+    pinMode(PIN_MTR1_DIR_REV, OUTPUT);
+    pinMode(PIN_MTR2_DIR_FWD, OUTPUT);
+    pinMode(PIN_MTR2_DIR_REV, OUTPUT);
+    digitalWrite(PIN_MTR1_DIR_FWD, LOW);
+    digitalWrite(PIN_MTR1_DIR_REV, LOW);
+    digitalWrite(PIN_MTR2_DIR_FWD, LOW);
+    digitalWrite(PIN_MTR2_DIR_REV, LOW);
+}
+
 void initDisplay()
 {
     display.clear();
     display.setCursor(0, 0);
     display.print(F("Cmd:"));
-
-    display.setCursor(0, 2);
-    display.print(F("Rng:"));
 
     display.setCursor(0, 3);
     display.print(F("Time:"));
@@ -396,9 +415,9 @@ void updateDisplay()
 
     switch (printStep) {
     case 0: {
-        auto cmd = cmdQueue.current();
+        auto cmd = cmdQueue.currentCmd();
         if (lastCmd != cmd) {
-            display.setCursor(4, 0);
+            display.setCursor(5, 0);
             switch (cmd) {
             case VEHICLE_START_WAIT:
                 display.print(F("WAIT START     "));
@@ -432,11 +451,7 @@ void updateDisplay()
     case 1:
     case 2:
         break;
-    case 3:
-        display.setCursor(4, 2);
-        display.print("no sonic");
-        break;
-    case 4: {
+    case 3: {
         display.setCursor(6, 3);
         auto time = (float)timerRunTime / 1000000.0;
         display.print(time, 3);
@@ -467,31 +482,6 @@ void setup()
     display.clear();
     display.setCursor(0, 0);
     display.print(F("Start Up....."));
-
-    pinMode(PIN_PB_START, INPUT_PULLUP);
-
-    pinMode(PIN_MTR1_PWM, OUTPUT);
-    pinMode(PIN_MTR2_PWM, OUTPUT);
-
-    pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
-    pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
-
-    attachInterrupt(digitalPinToInterrupt(PIN_MTR1_ENCA), encoderIntLeft, RISING);
-    attachInterrupt(digitalPinToInterrupt(PIN_MTR2_ENCA), encoderIntRight, RISING);
-
-    pinMode(PIN_MTR1_DIR_FWD, OUTPUT);
-    pinMode(PIN_MTR1_DIR_REV, OUTPUT);
-    pinMode(PIN_MTR2_DIR_FWD, OUTPUT);
-    pinMode(PIN_MTR2_DIR_REV, OUTPUT);
-    digitalWrite(PIN_MTR1_DIR_FWD, LOW);
-    digitalWrite(PIN_MTR1_DIR_REV, LOW);
-    digitalWrite(PIN_MTR2_DIR_FWD, LOW);
-    digitalWrite(PIN_MTR2_DIR_REV, LOW);
-
-    int speedAccel = 100;
-    int speedMin = SPEED_MIN;
-    mtrLeft.setParams(speedAccel, speedMin, PIN_MTR1_PWM);
-    mtrRight.setParams(speedAccel, speedMin, PIN_MTR2_PWM);
 
     initDisplay();
 
@@ -525,34 +515,32 @@ void loop()
         timerPBStartOff += usecElapsed;
     }
 
-    if (cmdQueue.current() > VEHICLE_START && cmdQueue.current() < VEHICLE_ABORT) {
+    if (cmdQueue.currentCmd() > VEHICLE_START && cmdQueue.currentCmd() < VEHICLE_ABORT) {
         if (timerPBStartOn > 100000) {
-            cmdQueue = {};
+            cmdQueue.clear();
             cmdQueue.add(VEHICLE_ABORT);
-            mtrLeft.stop();
-            mtrRight.stop();
-            setMotorDirection();
+            return;
         }
     }
 
     if (flagTimeRun)
         timerRunTime += usecElapsed;
 
-    switch (cmdQueue.current()) {
+    switch (cmdQueue.currentCmd()) {
     case VEHICLE_START_WAIT:
         if (timerPBStartOn > 100000)
             cmdQueue.next();
         break;
     case VEHICLE_START:
-        timerRunTime = 0;
         if (timerPBStartOff > 100000) {
             cmdQueue.next();
             flagTimeRun = true;
+            timerRunTime = 0;
         }
         break;
     case VEHICLE_FORWARD:
         if (newCmd) {
-            long distance = cmdQueue.getParameter1() * PULSES_PER_MM;
+            long distance = cmdQueue.currentParam() * PULSES_PER_MM;
             mtrLeft.startMove(distance, speedFwd);
             mtrRight.startMove(distance, speedFwd);
             setMotorDirection();
@@ -588,16 +576,16 @@ void loop()
         }
         break;
     case VEHICLE_SET_MOVE_SPEED:
-        speedFwd = cmdQueue.getParameter1();
+        speedFwd = cmdQueue.currentParam();
         cmdQueue.next();
         break;
     case VEHICLE_SET_TURN_SPEED:
-        speedTurn = cmdQueue.getParameter1();
+        speedTurn = cmdQueue.currentParam();
         cmdQueue.next();
         break;
     case VEHICLE_SET_ACCEL:
-        mtrLeft.setAccel(cmdQueue.getParameter1());
-        mtrRight.setAccel(cmdQueue.getParameter1());
+        mtrLeft.setAccel(cmdQueue.currentParam());
+        mtrRight.setAccel(cmdQueue.currentParam());
         cmdQueue.next();
         break;
     case VEHICLE_FINISHED:
@@ -606,17 +594,16 @@ void loop()
             mtrLeft.stop();
             mtrRight.stop();
             setMotorDirection();
+            flagTimeRun = false;
         }
-        flagTimeRun = false;
         break;
     case VEHICLE_ABORT:
         mtrLeft.stop();
         mtrRight.stop();
         setMotorDirection();
         flagTimeRun = false;
-        if (timerPBStartOff > 200000) {
+        if (timerPBStartOff > 200000)
             loadCommandQueue();
-        }
         break;
     }
 }
