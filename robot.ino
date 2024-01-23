@@ -380,6 +380,9 @@ void initPins()
 
 void initDisplay()
 {
+    display.init();
+    display.backlight();
+
     display.clear();
     display.setCursor(0, 0);
     display.print(F("Cmd:"));
@@ -391,58 +394,41 @@ void initDisplay()
 void updateDisplay()
 {
     static int lastCmd = 0;
-    static int printStep = 0;
 
-    switch (printStep) {
-    case 0: {
-        auto cmd = cmdQueue.currentCmd();
-        if (lastCmd != cmd) {
-            display.setCursor(5, 0);
-            switch (cmd) {
-            case VEHICLE_START_WAIT:
-                display.print(F("WAIT START     "));
-                break;
-            case VEHICLE_START:
-                display.print(F("WAIT RELEASE   "));
-                break;
-            case VEHICLE_FORWARD:
-                display.print(F("FORWARD        "));
-                break;
-            case VEHICLE_TURN_RIGHT:
-                display.print(F("TURN RIGHT     "));
-                break;
-            case VEHICLE_TURN_LEFT:
-                display.print(F("TURN LEFT      "));
-                break;
-            case VEHICLE_FINISHED:
-                display.print(F("FINISHED       "));
-                break;
-            case VEHICLE_ABORT:
-                display.print(F("ABORT          "));
-                break;
-            default:
-                display.print(F("***unknown**"));
-                break;
-            }
-            lastCmd = cmd;
+    auto cmd = cmdQueue.currentCmd();
+    if (lastCmd != cmd) {
+        display.setCursor(5, 0);
+        switch (cmd) {
+        case VEHICLE_START_WAIT:
+            display.print(F("WAIT START  "));
+            break;
+        case VEHICLE_START:
+            display.print(F("WAIT RELEASE"));
+            break;
+        case VEHICLE_FORWARD:
+            display.print(F("FORWARD     "));
+            break;
+        case VEHICLE_TURN_RIGHT:
+            display.print(F("TURN RIGHT  "));
+            break;
+        case VEHICLE_TURN_LEFT:
+            display.print(F("TURN LEFT   "));
+            break;
+        case VEHICLE_FINISHED:
+            display.print(F("FINISHED    "));
+            break;
+        case VEHICLE_ABORT:
+            display.print(F("ABORT       "));
+            break;
+        default:
+            ASSERT(!"Unreachable");
         }
-        break;
-    }
-    case 1:
-    case 2:
-        break;
-    case 3: {
-        display.setCursor(6, 3);
-        auto time = (float)timerRunTime / 1000000.0;
-        display.print(time, 3);
-        break;
-    }
-    default:
-        printStep = 0;
-        return;
+        lastCmd = cmd;
     }
 
-    ++printStep;
+    display.setCursor(6, 3);
+    auto time = (float)timerRunTime / 1000000.0;
+    display.print(time, 3);
 }
 
 void setup()
@@ -457,13 +443,6 @@ void setup()
     }
 
     initPins();
-
-    display.init();
-    display.backlight();
-    display.clear();
-    display.setCursor(0, 0);
-    display.print(F("Start Up....."));
-
     initDisplay();
 
     loadCommandQueue();
