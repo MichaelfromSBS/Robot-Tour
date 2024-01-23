@@ -11,8 +11,20 @@
 #define PIN_MTR2_PWM     10
 
 #define PULSES_PER_MM         2.257
-#define ENCODER_COUNTS_90_DEG 314 // Set to the number of encoder pulses to make a 90 degree turn
-#define SPEED_MIN             120 // Minimum speed (pulses/second) use at the end of individual moves
+#define ENCODER_COUNTS_90_DEG 314
+#define SPEED_MIN             120
+
+#define ASSERT(e)                              \
+    if (!(e)) {                                \
+        display.clear();                       \
+        display.setCursor(0, 0);               \
+        display.print(F("ASSERTION FAILED:")); \
+        display.setCursor(0, 1);               \
+        display.print(F(#e));                  \
+        display.setCursor(0, 2);               \
+        display.print(__LINE__);               \
+        abort();                               \
+    }
 
 LiquidCrystal_I2C display { 0x27, 20, 4 };
 
@@ -28,7 +40,7 @@ unsigned long msTimerPrint = 0;
 unsigned long timerPBStartOn = 0;
 unsigned long timerPBStartOff = 0;
 
-#define MAX_COMMANDS 60 // Maximum number of motion commands allowed
+#define MAX_COMMANDS 60
 
 class CommandQueue {
 public:
@@ -50,8 +62,7 @@ public:
 
     void add(int cmd, int param = 0)
     {
-        if (end >= MAX_COMMANDS)
-            return;
+        ASSERT(end < MAX_COMMANDS);
         list[end++] = { cmd, param };
     }
 
@@ -165,7 +176,7 @@ public:
         float distAccel = (float)speedTarget / 2.0 * tAccel;
         float distDecel = (float)speedTarget / 2.0 * tDecel;
         float distAtSpeed = (float)positionTarget - distAccel - distDecel;
-        if (distAtSpeed < 0.0) { // current written as accel and decel same
+        if (distAtSpeed < 0.0) {
             // Serial.println("Motion - Short move logic");
             distAccel = (float)positionTarget / 2.0;
             distDecel = (float)positionTarget / 2.0;
@@ -184,10 +195,7 @@ public:
         pwmLoopP = 0;
         countEncoder = 0;
         countEncoderLast = 0;
-        posProfile = 0;
-        speedAtDecel = -10000;
         timeRunning = 0;
-        timeRunningLast = 0;
         timerUpdate = 0;
         stopped = false;
         counterStopped = 0;
@@ -199,15 +207,13 @@ public:
         forward = true;
         analogWrite(pinPWM, 0);
         running = false;
-        posProfile = 0;
-        speedProfile = 0;
         speedTarget = 0;
     }
 
     void updateMotion(long usecElapsed)
     {
         int flagUpdate = 0;
-        int speedActual;
+        int speedActual; // p/s
 
         timerUpdate += usecElapsed;
         if (timerUpdate >= 30000) {
@@ -251,35 +257,24 @@ public:
         if (flagUpdate == 0)
             return;
 
-        float speed;
+        int speedProfile; // p/s
         if (timeRunning < timeAtSpeed) {
-            speed = (float)timeRunning / 1000000.0 * (float)accelRate;
-            speedProfile = (int)speed;
-            // if (debug) { Serial.print(" - Accel speedProfile = "); Serial.println(speedProfile); }
+            speedProfile = (float)timeRunning / 1000000.0 * (float)accelRate;
         } else if (timeRunning < timeDecel) {
             speedProfile = speedTarget;
-            // if (debug) { Serial.print(" - At Speed speedProfile = "); Serial.println(speedProfile); }
         } else {
-            if (speedAtDecel <= -10000)
-                speedAtDecel = speedProfile;
-            speed = (float)(timeRunning - timeDecel) / 1000000.0 * (float)decelRate;
-            speedProfile = speedAtDecel - (int)speed;
+            speedProfile = speedTarget - (float)(timeRunning - timeDecel) / 1000000.0 * (float)decelRate;
             if (speedProfile < speedMinimum)
                 speedProfile = speedMinimum;
-            // if (debug) { Serial.print(" - Decel speedProfile = "); Serial.println(speedProfile); }
         }
 
-        posProfile += (speedProfile * (timeRunning - timeRunningLast)) / 1000000;
-        timeRunningLast = timeRunning;
-
-        long perror = posProfile - countEncoder;
-        int serror = speedProfile - speedActual;
+        int speedError = speedProfile - speedActual;
 
         // This program uses a PI loop to control speed
         // This loop is NOT tuned.  Meaning testing is required to tune the loop
-        // which will provide the best preformance
-        pwmLoopI += serror / 4;
-        pwmLoopP = serror / 2;
+        // which will provide the best performance
+        pwmLoopI += speedError / 4;
+        pwmLoopP = speedError / 2;
 
         auto outputPWM = constrain(pwmLoopP + pwmLoopI, 0, 254);
 
@@ -292,10 +287,8 @@ public:
             Serial.print(speedProfile);
             Serial.print(",speedActual:");
             Serial.print(speedActual);
-            Serial.print(",pos_error:");
-            Serial.print(perror);
-            Serial.print(",speed_error:");
-            Serial.print(serror);
+            Serial.print(",speedError:");
+            Serial.print(speedError);
             Serial.print(",loopI:");
             Serial.print(pwmLoopI);
             Serial.print(",loopP:");
@@ -308,12 +301,11 @@ public:
     }
 
 private:
-    long timeAtSpeed = 0;
-    long timeDecel = 0;
+    long timeAtSpeed = 0; // us
+    long timeDecel = 0;   // us
 
-    long timeRunning = 0;
-    long timeRunningLast = 0;
-    long timerUpdate = 0;
+    long timeRunning = 0; // us
+    long timerUpdate = 0; // us
 
     int pinPWM;
     bool forward = true;
@@ -330,15 +322,12 @@ private:
     long countEncoder = 0;
     long countEncoderLast = 0;
 
-    long accelRate = 100;
-    long decelRate = 100;
-    long posProfile = 0;
+    long accelRate = 100; // p/s^2
+    long decelRate = 100; // p/s^2
 
-    long positionTarget = 0;
-    int speedTarget = 0;
-    int speedProfile = 0;
-    int speedMinimum = SPEED_MIN;
-    int speedAtDecel = -10000;
+    long positionTarget = 0;      // p
+    int speedTarget = 0;          // p/s
+    int speedMinimum = SPEED_MIN; // p/s
 };
 
 MotionLogic mtrLeft { PIN_MTR1_PWM };
@@ -469,9 +458,8 @@ void setup()
 
     initPins();
 
-    // Serial.println(F("Display init()"));
-    display.init();      // initialize the lcd
-    display.backlight(); // open the backlight
+    display.init();
+    display.backlight();
     display.clear();
     display.setCursor(0, 0);
     display.print(F("Start Up....."));
