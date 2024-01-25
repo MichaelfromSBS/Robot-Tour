@@ -15,17 +15,6 @@
 #define SPEED_MIN             120
 #define MAX_COMMANDS          60
 
-#define VEHICLE_START_WAIT     1 // Wait for the start button to be pressed
-#define VEHICLE_START          2 // First motion command after button press
-#define VEHICLE_FORWARD        10
-#define VEHICLE_TURN_RIGHT     40
-#define VEHICLE_TURN_LEFT      50
-#define VEHICLE_SET_MOVE_SPEED 101
-#define VEHICLE_SET_TURN_SPEED 102
-#define VEHICLE_SET_ACCEL      105
-#define VEHICLE_FINISHED       900  // Must be at the end of the command list
-#define VEHICLE_ABORT          2000 // Used to abort the current movement list and stop the robot
-
 #define ASSERT(e)                              \
     if (!(e)) {                                \
         display.clear();                       \
@@ -39,6 +28,20 @@
     }
 
 namespace {
+
+enum {
+    VEHICLE_START_WAIT = 1,
+    VEHICLE_START,
+    VEHICLE_FORWARD,
+    VEHICLE_TURN_RIGHT,
+    VEHICLE_TURN_LEFT,
+    VEHICLE_TURN_180,
+    VEHICLE_SET_MOVE_SPEED,
+    VEHICLE_SET_TURN_SPEED,
+    VEHICLE_SET_ACCEL,
+    VEHICLE_FINISHED,
+    VEHICLE_ABORT
+};
 
 class CommandQueue {
 public:
@@ -386,6 +389,9 @@ void updateDisplay(unsigned long time)
         case VEHICLE_TURN_LEFT:
             display.print(F("TURN LEFT   "));
             break;
+        case VEHICLE_TURN_180:
+            display.print(F("TURN 180    "));
+            break;
         case VEHICLE_FINISHED:
             display.print(F("FINISHED    "));
             break;
@@ -453,8 +459,6 @@ void loop()
     }
     msTimerPrint += usecElapsed;
 
-    auto newCmd = cmdQueue.firstScan();
-
     if (!digitalRead(PIN_PB_START)) {
         timerPBStartOn += usecElapsed;
         timerPBStartOff = 0;
@@ -463,7 +467,10 @@ void loop()
         timerPBStartOff += usecElapsed;
     }
 
-    if (cmdQueue.currentCmd() > VEHICLE_START && cmdQueue.currentCmd() < VEHICLE_ABORT) {
+    auto newCmd = cmdQueue.firstScan();
+    auto cmd = cmdQueue.currentCmd();
+
+    if (cmd > VEHICLE_START && cmd < VEHICLE_ABORT) {
         if (timerPBStartOn > 100000) {
             cmdQueue.clear();
             cmdQueue.add(VEHICLE_ABORT);
@@ -474,7 +481,7 @@ void loop()
     if (timerRunning)
         timerRunTime += usecElapsed;
 
-    switch (cmdQueue.currentCmd()) {
+    switch (cmd) {
     case VEHICLE_START_WAIT:
         if (timerPBStartOn > 100000)
             cmdQueue.next();
@@ -515,6 +522,18 @@ void loop()
         if (newCmd) {
             mtrLeft.startMove(ENCODER_COUNTS_90_DEG, -speedTurn);
             mtrRight.startMove(ENCODER_COUNTS_90_DEG, speedTurn);
+            setMotorDirection();
+        }
+
+        if (mtrLeft.isStopped() && mtrRight.isStopped()) {
+            setMotorDirection();
+            cmdQueue.next();
+        }
+        break;
+    case VEHICLE_TURN_180:
+        if (newCmd) {
+            mtrLeft.startMove(ENCODER_COUNTS_90_DEG * 2, speedTurn);
+            mtrRight.startMove(ENCODER_COUNTS_90_DEG * 2, -speedTurn);
             setMotorDirection();
         }
 
