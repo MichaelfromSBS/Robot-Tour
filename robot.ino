@@ -1,4 +1,5 @@
 // 7.229s, 3.511s----->gap between two movement: 0.207s
+// time of 
 #include <LiquidCrystal_I2C.h>
 
 #define PIN_MTR1_ENCA    2
@@ -11,7 +12,7 @@
 #define PIN_MTR1_PWM     9
 #define PIN_MTR2_PWM     10
 
-#define PULSES_PER_MM         2.257
+#define PULSES_PER_MM         2.278
 #define ENCODER_COUNTS_90_DEG 313
 #define SPEED_MIN             120
 #define MAX_COMMANDS          60
@@ -93,8 +94,8 @@ public:
         // Speed is encoder pulses per second.
         // There is a maximum speed.  Testing will be required to learn this speed.
         //    SETTING THE SPEEDS ABOVE THE MOTOR'S MAXIMUM SPEED WILL CAUSE STRANGE RESULTS
-        add(VEHICLE_SET_MOVE_SPEED, 200); // Speed used for forward movements
-        add(VEHICLE_SET_TURN_SPEED, 300); // Speed used for left or right turns
+        add(VEHICLE_SET_MOVE_SPEED, 500); // Speed used for forward movements
+        add(VEHICLE_SET_TURN_SPEED, 200); // Speed used for left or right turns
         add(VEHICLE_SET_ACCEL, 400);      // smaller is softer   larger is quicker and less accurate moves
 
         // Example list of robot movements
@@ -108,30 +109,30 @@ public:
         // // add(VEHICLE_FORWARD, 500);
         // add(VEHICLE_TURN_LEFT);
         // ---------------------------------------------EXAMPLE1--------------------------------------------------------------
-        // add(VEHICLE_FORWARD,330);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD,1000);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD,500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD,420);
+        add(VEHICLE_FORWARD,325);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,1000);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,425);
         // --------------------------------------------------------EXAMPLE1------------------------------------------------------
-        // add(VEHICLE_FORWARD, 330);
+        // add(VEHICLE_FORWARD, 325);
         // add(VEHICLE_TURN_RIGHT);
         // add(VEHICLE_FORWARD, 500);
         // add(VEHICLE_TURN_LEFT);
@@ -151,9 +152,9 @@ public:
         // add(VEHICLE_TURN_RIGHT);
         // add(VEHICLE_FORWARD, 1000);
         // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD, 920);
+        // add(VEHICLE_FORWARD, 925);
         // -------------------------------------------------------------------------------------
-        add(VEHICLE_FORWARD, 2000);
+        // add(VEHICLE_FORWARD, 900);
         // This MUST be the last command.
         add(VEHICLE_FINISHED);
     }
