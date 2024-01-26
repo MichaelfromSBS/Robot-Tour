@@ -154,9 +154,9 @@ void loadCommandQueue()
     // cmdQueue.add(VEHICLE_TURN_LEFT);
     // // cmdQueue.add(VEHICLE_FORWARD, 500);
     // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // ---------------------------------------------EXAMPLE1----------------------------------------------------------
+    // ---------------------------------------------EXAMPLE1--------------------------------------------------------------
       // cmdQueue.add(VEHICLE_FORWARD,330);
-      // cmdQueue.add(VEHICLE_TURN_RIGHT);
+      // cmdQueue.add(VEHICLE_TURN_RIGHT); 
       // cmdQueue.add(VEHICLE_FORWARD,500);
       // cmdQueue.add(VEHICLE_TURN_LEFT);
       // cmdQueue.add(VEHICLE_FORWARD,500);
