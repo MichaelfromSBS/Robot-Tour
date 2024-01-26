@@ -44,6 +44,8 @@ enum {
     VEHICLE_ABORT
 };
 
+LiquidCrystal_I2C display { 0x27, 20, 4 };
+
 class CommandQueue {
 public:
     struct Command {
@@ -442,7 +444,6 @@ void updateDisplay(unsigned long time)
 }
 
 unsigned long usLast = 0;
-LiquidCrystal_I2C display { 0x27, 20, 4 };
 CommandQueue cmdQueue;
 MotionLogic mtrLeft { PIN_MTR1_PWM };
 MotionLogic mtrRight { PIN_MTR2_PWM };
