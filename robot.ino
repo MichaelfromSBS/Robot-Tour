@@ -1,5 +1,6 @@
-#include <LiquidCrystal_I2C.h>
 // 7.229s, 3.511s----->gap between two movement: 0.207s
+#include <LiquidCrystal_I2C.h>
+
 #define PIN_MTR1_ENCA    2
 #define PIN_MTR2_ENCA    3
 #define PIN_PB_START     4
@@ -96,14 +97,60 @@ public:
 
         // Example list of robot movements
         // This block is modified for each tournament
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_LEFT);
+        // // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_LEFT);
+        // // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_LEFT);
+        // // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_LEFT);
+        // ---------------------------------------------EXAMPLE1--------------------------------------------------------------
+        // add(VEHICLE_FORWARD,330);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD,1000);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD,500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD,420);
+        // --------------------------------------------------------EXAMPLE1------------------------------------------------------
+        add(VEHICLE_FORWARD, 330);
+        add(VEHICLE_TURN_RIGHT);
         add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD, 1000);
         add(VEHICLE_TURN_LEFT);
         add(VEHICLE_FORWARD, 500);
         add(VEHICLE_TURN_LEFT);
         add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_RIGHT);
         add(VEHICLE_FORWARD, 500);
         add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD, 1000);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD, 920);
 
         // This MUST be the last command.
         add(VEHICLE_FINISHED);
@@ -116,129 +163,6 @@ private:
     bool isFirstScan = true;
 };
 
-<<<<<<< HEAD
-CommandQueue cmdQueue;
-
-#define VEHICLE_START_WAIT     1 // Wait for the start button to be pressed
-#define VEHICLE_START          2 // First motion command after button press
-#define VEHICLE_FORWARD        10
-#define VEHICLE_TURN_RIGHT     40
-#define VEHICLE_TURN_LEFT      50
-#define VEHICLE_SET_MOVE_SPEED 101
-#define VEHICLE_SET_TURN_SPEED 102
-#define VEHICLE_SET_ACCEL      105
-#define VEHICLE_FINISHED       900  // Must be at the end of the command list
-#define VEHICLE_ABORT          2000 // Used to abort the current movement list and stop the robot
-
-void loadCommandQueue()
-{
-    cmdQueue.clear();
-    cmdQueue.add(VEHICLE_START_WAIT); // do not change this line - waits for start pushbutton
-    cmdQueue.add(VEHICLE_START);      // do not change this line
-
-    // Define robot movement speeds
-    // Speed is encoder pulses per second.
-    // There is a maximum speed.  Testing will be required to learn this speed.
-    //    SETTING THE SPEEDS ABOVE THE MOTOR'S MAXIMUM SPEED WILL CAUSE STRANGE RESULTS
-    cmdQueue.add(VEHICLE_SET_MOVE_SPEED, 500); // Speed used for forward movements
-    cmdQueue.add(VEHICLE_SET_TURN_SPEED, 300); // Speed used for left or right turns
-    cmdQueue.add(VEHICLE_SET_ACCEL, 400);      // smaller is softer   larger is quicker and less accurate moves
-
-    // Example list of robot movements
-    // This block is modified for each tournament
-    // cmdQueue.add(VEHICLE_FORWARD, 500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // // cmdQueue.add(VEHICLE_FORWARD, 500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // // cmdQueue.add(VEHICLE_FORWARD, 500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // // cmdQueue.add(VEHICLE_FORWARD, 500);
-    // cmdQueue.add(VEHICLE_TURN_LEFT);
-    // ---------------------------------------------EXAMPLE1--------------------------------------------------------------
-      // cmdQueue.add(VEHICLE_FORWARD,330);
-      // cmdQueue.add(VEHICLE_TURN_RIGHT); 
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_LEFT);
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_RIGHT);
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_LEFT);
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_LEFT);
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_RIGHT);
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_LEFT);
-      // cmdQueue.add(VEHICLE_TURN_LEFT);
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_RIGHT);
-      // cmdQueue.add(VEHICLE_FORWARD,1000);
-      // cmdQueue.add(VEHICLE_TURN_RIGHT);
-      // cmdQueue.add(VEHICLE_FORWARD,500);
-      // cmdQueue.add(VEHICLE_TURN_RIGHT);
-      // cmdQueue.add(VEHICLE_FORWARD,420);
-// --------------------------------------------------------EXAMPLE1------------------------------------------------------
-      cmdQueue.add(VEHICLE_FORWARD,330);
-      cmdQueue.add(VEHICLE_TURN_RIGHT);
-      cmdQueue.add(VEHICLE_FORWARD,500);
-      cmdQueue.add(VEHICLE_TURN_LEFT);
-      cmdQueue.add(VEHICLE_FORWARD,1000);
-      cmdQueue.add(VEHICLE_TURN_LEFT);
-      cmdQueue.add(VEHICLE_FORWARD,500);
-      cmdQueue.add(VEHICLE_TURN_LEFT);
-      cmdQueue.add(VEHICLE_FORWARD,500);
-      cmdQueue.add(VEHICLE_TURN_RIGHT);
-      cmdQueue.add(VEHICLE_FORWARD,500);
-      cmdQueue.add(VEHICLE_TURN_RIGHT);
-      cmdQueue.add(VEHICLE_FORWARD,500);
-      cmdQueue.add(VEHICLE_TURN_LEFT);
-      cmdQueue.add(VEHICLE_TURN_LEFT);
-      cmdQueue.add(VEHICLE_FORWARD,500);
-      cmdQueue.add(VEHICLE_TURN_RIGHT);
-      cmdQueue.add(VEHICLE_FORWARD,500);
-      cmdQueue.add(VEHICLE_TURN_RIGHT);
-      cmdQueue.add(VEHICLE_FORWARD,1000);
-      cmdQueue.add(VEHICLE_TURN_RIGHT);
-      cmdQueue.add(VEHICLE_FORWARD,920);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // This MUST be the last command.
-    cmdQueue.add(VEHICLE_FINISHED);
-}
-
-//======================================================================================
-// Motion object (like a library) that calculates the acceleration used for motor speed
-// control.
-//
-// Distance is encoder pulses
-// Speed is encoder pulses per second
-// Accel is encoder pulses per second^2
-//======================================================================================
-=======
->>>>>>> 4123affb87464c38d4d4d28593863ff6755c86a2
 class MotionLogic {
 public:
     explicit MotionLogic(int pwmPin)
@@ -247,7 +171,7 @@ public:
     }
 
     bool isForward() { return forward; }
-    bool isStopped() { return stopped; }
+    bool isStopped() { return !running; }
 
     void incrEncoder() { ++countEncoder; }
 
@@ -273,8 +197,8 @@ public:
             Serial.println(positionTarget);
         }
 
-        float tAccel = (float)speedTarget / (float)accelRate;
-        float tDecel = (float)speedTarget / (float)decelRate;
+        float tAccel = (float)speedTarget / accelRate;
+        float tDecel = (float)speedTarget / decelRate;
         float distAccel = (float)speedTarget / 2.0 * tAccel;
         float distDecel = (float)speedTarget / 2.0 * tDecel;
         float distAtSpeed = (float)positionTarget - distAccel - distDecel;
@@ -284,10 +208,10 @@ public:
             distDecel = (float)positionTarget / 2.0;
             distAtSpeed = 0.0;
 
-            tAccel = sqrt(distAccel * 2.0 / (float)accelRate);
-            tDecel = sqrt(distDecel * 2.0 / (float)decelRate);
+            tAccel = sqrt(distAccel * 2.0 / accelRate);
+            tDecel = sqrt(distDecel * 2.0 / decelRate);
         }
-        float tAtSpeed = distAtSpeed / (float)speedTarget;
+        float tAtSpeed = distAtSpeed / speedTarget;
 
         timeAtSpeed = tAccel * 1000000;
         timeDecel = timeAtSpeed + tAtSpeed * 1000000;
@@ -298,8 +222,6 @@ public:
         countEncoderLast = 0;
         timeRunning = 0;
         timerUpdate = 0;
-        stopped = false;
-        counterStopped = 0;
         running = true;
     }
 
@@ -313,28 +235,23 @@ public:
 
     void updateMotion(long usecElapsed)
     {
-        int flagUpdate = 0;
-        int speedActual; // p/s
-
-        timerUpdate += usecElapsed;
-        if (timerUpdate >= 30000) {
-            auto delta = countEncoder - countEncoderLast;
-            speedActual = delta * 1000000L / timerUpdate;
-            countEncoderLast = countEncoder;
-            timerUpdate = 0;
-            flagUpdate = 1;
-            if (!running && speedActual < 4) {
-                if (!stopped)
-                    ++counterStopped;
-                if (counterStopped > 2)
-                    stopped = true;
-            }
-        }
-
         if (!running) {
             forward = true;
             pwmLoopP = 0;
             pwmLoopI = 0;
+            return;
+        }
+
+        timeRunning += usecElapsed;
+        timerUpdate += usecElapsed;
+
+        int speedActual; // p/s
+        if (timerUpdate >= 30000) {
+            auto delta = countEncoder - countEncoderLast;
+            speedActual = delta * 1000000 / timerUpdate;
+            countEncoderLast = countEncoder;
+            timerUpdate = 0;
+        } else {
             return;
         }
 
@@ -354,17 +271,13 @@ public:
             return;
         }
 
-        timeRunning += usecElapsed;
-        if (flagUpdate == 0)
-            return;
-
         int speedProfile; // p/s
         if (timeRunning < timeAtSpeed) {
-            speedProfile = (float)timeRunning / 1000000.0 * (float)accelRate;
+            speedProfile = (float)timeRunning / 1000000.0 * accelRate;
         } else if (timeRunning < timeDecel) {
             speedProfile = speedTarget;
         } else {
-            speedProfile = speedTarget - (float)(timeRunning - timeDecel) / 1000000.0 * (float)decelRate;
+            speedProfile = speedTarget - (float)(timeRunning - timeDecel) / 1000000.0 * decelRate;
             if (speedProfile < speedMinimum)
                 speedProfile = speedMinimum;
         }
@@ -410,10 +323,7 @@ private:
 
     int pinPWM;
     bool forward = true;
-
     bool running = false;
-    bool stopped = false;
-    int counterStopped = 0;
 
     int pwmLoopI = 0;
     int pwmLoopP = 0;
