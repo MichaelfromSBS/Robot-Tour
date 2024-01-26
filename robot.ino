@@ -152,8 +152,8 @@ public:
         // add(VEHICLE_FORWARD, 1000);
         // add(VEHICLE_TURN_RIGHT);
         // add(VEHICLE_FORWARD, 920);
-// -------------------------------------------------------------------------------------
-add(VEHICLE_FORWARD,2000);
+        // -------------------------------------------------------------------------------------
+        add(VEHICLE_FORWARD, 2000);
         // This MUST be the last command.
         add(VEHICLE_FINISHED);
     }
@@ -204,6 +204,7 @@ public:
         float distAccel = (float)speedTarget / 2.0 * tAccel;
         float distDecel = (float)speedTarget / 2.0 * tDecel;
         float distAtSpeed = (float)positionTarget - distAccel - distDecel;
+#if 0
         if (distAtSpeed < 0.0) {
             // Serial.println("Motion - Short move logic");
             distAccel = (float)positionTarget / 2.0;
@@ -213,6 +214,9 @@ public:
             tAccel = sqrt(distAccel * 2.0 / accelRate);
             tDecel = sqrt(distDecel * 2.0 / decelRate);
         }
+#else
+        ASSERT(distAtSpeed > 0);
+#endif
         float tAtSpeed = distAtSpeed / speedTarget;
 
         timeAtSpeed = tAccel * 1000000;
