@@ -13,6 +13,7 @@
 #define PULSES_PER_MM         2.257
 #define ENCODER_COUNTS_90_DEG 313
 #define SPEED_MIN             120
+#define MAX_COMMANDS          60
 
 #define ASSERT(e)                              \
     if (!(e)) {                                \
@@ -26,21 +27,21 @@
         abort();                               \
     }
 
-LiquidCrystal_I2C display { 0x27, 20, 4 };
+namespace {
 
-unsigned long usLast = 0;
-
-unsigned long timerRunTime = 0;
-int speedFwd = 100;
-int speedTurn = 100;
-bool timerRunning = false;
-
-unsigned long msTimerPrint = 0;
-
-unsigned long timerPBStartOn = 0;
-unsigned long timerPBStartOff = 0;
-
-#define MAX_COMMANDS 60
+enum {
+    VEHICLE_START_WAIT = 1,
+    VEHICLE_START,
+    VEHICLE_FORWARD,
+    VEHICLE_TURN_RIGHT,
+    VEHICLE_TURN_LEFT,
+    VEHICLE_TURN_180,
+    VEHICLE_SET_MOVE_SPEED,
+    VEHICLE_SET_TURN_SPEED,
+    VEHICLE_SET_ACCEL,
+    VEHICLE_FINISHED,
+    VEHICLE_ABORT
+};
 
 class CommandQueue {
 public:
@@ -51,7 +52,6 @@ public:
 
     int currentCmd() { return list[start].cmd; }
     int currentParam() { return list[start].param; }
-    bool empty() { return start == end; }
 
     bool firstScan()
     {
@@ -80,6 +80,35 @@ public:
         end = 0;
     }
 
+    void load()
+    {
+        clear();
+        add(VEHICLE_START_WAIT); // do not change this line - waits for start pushbutton
+        add(VEHICLE_START);      // do not change this line
+
+        // Define robot movement speeds
+        // Speed is encoder pulses per second.
+        // There is a maximum speed.  Testing will be required to learn this speed.
+        //    SETTING THE SPEEDS ABOVE THE MOTOR'S MAXIMUM SPEED WILL CAUSE STRANGE RESULTS
+        add(VEHICLE_SET_MOVE_SPEED, 500); // Speed used for forward movements
+        add(VEHICLE_SET_TURN_SPEED, 300); // Speed used for left or right turns
+        add(VEHICLE_SET_ACCEL, 400);      // smaller is softer   larger is quicker and less accurate moves
+
+        // Example list of robot movements
+        // This block is modified for each tournament
+        add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD, 500);
+        add(VEHICLE_TURN_LEFT);
+
+        // This MUST be the last command.
+        add(VEHICLE_FINISHED);
+    }
+
 private:
     Command list[MAX_COMMANDS];
     size_t start = 0;
@@ -87,6 +116,7 @@ private:
     bool isFirstScan = true;
 };
 
+<<<<<<< HEAD
 CommandQueue cmdQueue;
 
 #define VEHICLE_START_WAIT     1 // Wait for the start button to be pressed
@@ -207,6 +237,8 @@ void loadCommandQueue()
 // Speed is encoder pulses per second
 // Accel is encoder pulses per second^2
 //======================================================================================
+=======
+>>>>>>> 4123affb87464c38d4d4d28593863ff6755c86a2
 class MotionLogic {
 public:
     explicit MotionLogic(int pwmPin)
@@ -257,7 +289,6 @@ public:
         }
         float tAtSpeed = distAtSpeed / (float)speedTarget;
 
-        // times are in microseconds
         timeAtSpeed = tAccel * 1000000;
         timeDecel = timeAtSpeed + tAtSpeed * 1000000;
 
@@ -400,9 +431,6 @@ private:
     int speedMinimum = SPEED_MIN; // p/s
 };
 
-MotionLogic mtrLeft { PIN_MTR1_PWM };
-MotionLogic mtrRight { PIN_MTR2_PWM };
-
 void setMotorDirection()
 {
     if (mtrLeft.isForward()) {
@@ -450,6 +478,9 @@ void initPins()
 
 void initDisplay()
 {
+    display.init();
+    display.backlight();
+
     display.clear();
     display.setCursor(0, 0);
     display.print(F("Cmd:"));
@@ -458,61 +489,54 @@ void initDisplay()
     display.print(F("Time:"));
 }
 
-void updateDisplay()
+void updateDisplay(unsigned long time)
 {
     static int lastCmd = 0;
-    static int printStep = 0;
 
-    switch (printStep) {
-    case 0: {
-        auto cmd = cmdQueue.currentCmd();
-        if (lastCmd != cmd) {
-            display.setCursor(5, 0);
-            switch (cmd) {
-            case VEHICLE_START_WAIT:
-                display.print(F("WAIT START     "));
-                break;
-            case VEHICLE_START:
-                display.print(F("WAIT RELEASE   "));
-                break;
-            case VEHICLE_FORWARD:
-                display.print(F("FORWARD        "));
-                break;
-            case VEHICLE_TURN_RIGHT:
-                display.print(F("TURN RIGHT     "));
-                break;
-            case VEHICLE_TURN_LEFT:
-                display.print(F("TURN LEFT      "));
-                break;
-            case VEHICLE_FINISHED:
-                display.print(F("FINISHED       "));
-                break;
-            case VEHICLE_ABORT:
-                display.print(F("ABORT          "));
-                break;
-            default:
-                display.print(F("***unknown**"));
-                break;
-            }
-            lastCmd = cmd;
+    auto cmd = cmdQueue.currentCmd();
+    if (lastCmd != cmd) {
+        display.setCursor(5, 0);
+        switch (cmd) {
+        case VEHICLE_START_WAIT:
+            display.print(F("WAIT START  "));
+            break;
+        case VEHICLE_START:
+            display.print(F("WAIT RELEASE"));
+            break;
+        case VEHICLE_FORWARD:
+            display.print(F("FORWARD     "));
+            break;
+        case VEHICLE_TURN_RIGHT:
+            display.print(F("TURN RIGHT  "));
+            break;
+        case VEHICLE_TURN_LEFT:
+            display.print(F("TURN LEFT   "));
+            break;
+        case VEHICLE_TURN_180:
+            display.print(F("TURN 180    "));
+            break;
+        case VEHICLE_FINISHED:
+            display.print(F("FINISHED    "));
+            break;
+        case VEHICLE_ABORT:
+            display.print(F("ABORT       "));
+            break;
+        default:
+            ASSERT(!"Unreachable");
         }
-        break;
-    }
-    case 1:
-    case 2:
-        break;
-    case 3: {
-        display.setCursor(6, 3);
-        auto time = (float)timerRunTime / 1000000.0;
-        display.print(time, 3);
-        break;
-    }
-    default:
-        printStep = 0;
-        return;
+        lastCmd = cmd;
     }
 
-    ++printStep;
+    display.setCursor(6, 3);
+    display.print((float)time / 1000000.0, 3);
+}
+
+unsigned long usLast = 0;
+LiquidCrystal_I2C display { 0x27, 20, 4 };
+CommandQueue cmdQueue;
+MotionLogic mtrLeft { PIN_MTR1_PWM };
+MotionLogic mtrRight { PIN_MTR2_PWM };
+
 }
 
 void setup()
@@ -527,22 +551,24 @@ void setup()
     }
 
     initPins();
-
-    display.init();
-    display.backlight();
-    display.clear();
-    display.setCursor(0, 0);
-    display.print(F("Start Up....."));
-
     initDisplay();
 
-    loadCommandQueue();
+    cmdQueue.load();
 
     usLast = micros();
 }
 
 void loop()
 {
+    static int speedFwd = 100;
+    static int speedTurn = 100;
+    static bool timerRunning = false;
+
+    static unsigned long timerRunTime = 0;
+    static unsigned long msTimerPrint = 0;
+    static unsigned long timerPBStartOn = 0;
+    static unsigned long timerPBStartOff = 0;
+
     auto current = micros();
     auto usecElapsed = current - usLast;
     usLast = current;
@@ -551,12 +577,10 @@ void loop()
     mtrRight.updateMotion(usecElapsed);
 
     if (msTimerPrint > 200000) {
-        updateDisplay();
+        updateDisplay(timerRunTime);
         msTimerPrint = 0;
     }
     msTimerPrint += usecElapsed;
-
-    auto newCmd = cmdQueue.firstScan();
 
     if (!digitalRead(PIN_PB_START)) {
         timerPBStartOn += usecElapsed;
@@ -566,7 +590,10 @@ void loop()
         timerPBStartOff += usecElapsed;
     }
 
-    if (cmdQueue.currentCmd() > VEHICLE_START && cmdQueue.currentCmd() < VEHICLE_ABORT) {
+    auto newCmd = cmdQueue.firstScan();
+    auto cmd = cmdQueue.currentCmd();
+
+    if (cmd > VEHICLE_START && cmd < VEHICLE_ABORT) {
         if (timerPBStartOn > 100000) {
             cmdQueue.clear();
             cmdQueue.add(VEHICLE_ABORT);
@@ -577,7 +604,7 @@ void loop()
     if (timerRunning)
         timerRunTime += usecElapsed;
 
-    switch (cmdQueue.currentCmd()) {
+    switch (cmd) {
     case VEHICLE_START_WAIT:
         if (timerPBStartOn > 100000)
             cmdQueue.next();
@@ -626,6 +653,18 @@ void loop()
             cmdQueue.next();
         }
         break;
+    case VEHICLE_TURN_180:
+        if (newCmd) {
+            mtrLeft.startMove(ENCODER_COUNTS_90_DEG * 2, speedTurn);
+            mtrRight.startMove(ENCODER_COUNTS_90_DEG * 2, -speedTurn);
+            setMotorDirection();
+        }
+
+        if (mtrLeft.isStopped() && mtrRight.isStopped()) {
+            setMotorDirection();
+            cmdQueue.next();
+        }
+        break;
     case VEHICLE_SET_MOVE_SPEED:
         speedFwd = cmdQueue.currentParam();
         cmdQueue.next();
@@ -640,7 +679,6 @@ void loop()
         cmdQueue.next();
         break;
     case VEHICLE_FINISHED:
-    default:
         if (newCmd) {
             mtrLeft.stop();
             mtrRight.stop();
@@ -654,7 +692,9 @@ void loop()
         setMotorDirection();
         timerRunning = false;
         if (timerPBStartOff > 200000)
-            loadCommandQueue();
+            cmdQueue.load();
         break;
+    default:
+        ASSERT(!"Unreachable");
     }
 }
