@@ -93,7 +93,7 @@ public:
         // Speed is encoder pulses per second.
         // There is a maximum speed.  Testing will be required to learn this speed.
         //    SETTING THE SPEEDS ABOVE THE MOTOR'S MAXIMUM SPEED WILL CAUSE STRANGE RESULTS
-        add(VEHICLE_SET_MOVE_SPEED, 500); // Speed used for forward movements
+        add(VEHICLE_SET_MOVE_SPEED, 200); // Speed used for forward movements
         add(VEHICLE_SET_TURN_SPEED, 300); // Speed used for left or right turns
         add(VEHICLE_SET_ACCEL, 400);      // smaller is softer   larger is quicker and less accurate moves
 
@@ -131,29 +131,29 @@ public:
         // add(VEHICLE_TURN_RIGHT);
         // add(VEHICLE_FORWARD,420);
         // --------------------------------------------------------EXAMPLE1------------------------------------------------------
-        add(VEHICLE_FORWARD, 330);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD, 1000);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD, 500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD, 1000);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD, 920);
-
+        // add(VEHICLE_FORWARD, 330);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_FORWARD, 1000);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_LEFT);
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_180);
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD, 500);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD, 1000);
+        // add(VEHICLE_TURN_RIGHT);
+        // add(VEHICLE_FORWARD, 920);
+// -------------------------------------------------------------------------------------
+add(VEHICLE_FORWARD,2000);
         // This MUST be the last command.
         add(VEHICLE_FINISHED);
     }
