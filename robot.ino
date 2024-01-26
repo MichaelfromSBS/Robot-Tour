@@ -1,5 +1,5 @@
 #include <LiquidCrystal_I2C.h>
-
+// 7.229s, 3.511s----->gap between two movement: 0.207s
 #define PIN_MTR1_ENCA    2
 #define PIN_MTR2_ENCA    3
 #define PIN_PB_START     4
@@ -11,7 +11,7 @@
 #define PIN_MTR2_PWM     10
 
 #define PULSES_PER_MM         2.257
-#define ENCODER_COUNTS_90_DEG 314
+#define ENCODER_COUNTS_90_DEG 313
 #define SPEED_MIN             120
 
 #define ASSERT(e)                              \
@@ -116,14 +116,84 @@ void loadCommandQueue()
 
     // Example list of robot movements
     // This block is modified for each tournament
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
-    cmdQueue.add(VEHICLE_FORWARD, 500);
-    cmdQueue.add(VEHICLE_TURN_LEFT);
+    // cmdQueue.add(VEHICLE_FORWARD, 500);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
+    // // cmdQueue.add(VEHICLE_FORWARD, 500);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
+    // // cmdQueue.add(VEHICLE_FORWARD, 500);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
+    // // cmdQueue.add(VEHICLE_FORWARD, 500);
+    // cmdQueue.add(VEHICLE_TURN_LEFT);
+    // ---------------------------------------------EXAMPLE1----------------------------------------------------------
+      // cmdQueue.add(VEHICLE_FORWARD,330);
+      // cmdQueue.add(VEHICLE_TURN_RIGHT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_LEFT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_RIGHT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_LEFT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_LEFT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_RIGHT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_LEFT);
+      // cmdQueue.add(VEHICLE_TURN_LEFT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_RIGHT);
+      // cmdQueue.add(VEHICLE_FORWARD,1000);
+      // cmdQueue.add(VEHICLE_TURN_RIGHT);
+      // cmdQueue.add(VEHICLE_FORWARD,500);
+      // cmdQueue.add(VEHICLE_TURN_RIGHT);
+      // cmdQueue.add(VEHICLE_FORWARD,420);
+// --------------------------------------------------------EXAMPLE1------------------------------------------------------
+      cmdQueue.add(VEHICLE_FORWARD,330);
+      cmdQueue.add(VEHICLE_TURN_RIGHT);
+      cmdQueue.add(VEHICLE_FORWARD,500);
+      cmdQueue.add(VEHICLE_TURN_LEFT);
+      cmdQueue.add(VEHICLE_FORWARD,1000);
+      cmdQueue.add(VEHICLE_TURN_LEFT);
+      cmdQueue.add(VEHICLE_FORWARD,500);
+      cmdQueue.add(VEHICLE_TURN_LEFT);
+      cmdQueue.add(VEHICLE_FORWARD,500);
+      cmdQueue.add(VEHICLE_TURN_RIGHT);
+      cmdQueue.add(VEHICLE_FORWARD,500);
+      cmdQueue.add(VEHICLE_TURN_RIGHT);
+      cmdQueue.add(VEHICLE_FORWARD,500);
+      cmdQueue.add(VEHICLE_TURN_LEFT);
+      cmdQueue.add(VEHICLE_TURN_LEFT);
+      cmdQueue.add(VEHICLE_FORWARD,500);
+      cmdQueue.add(VEHICLE_TURN_RIGHT);
+      cmdQueue.add(VEHICLE_FORWARD,500);
+      cmdQueue.add(VEHICLE_TURN_RIGHT);
+      cmdQueue.add(VEHICLE_FORWARD,1000);
+      cmdQueue.add(VEHICLE_TURN_RIGHT);
+      cmdQueue.add(VEHICLE_FORWARD,920);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // This MUST be the last command.
     cmdQueue.add(VEHICLE_FINISHED);
