@@ -343,6 +343,11 @@ private:
     int speedMinimum = SPEED_MIN; // p/s
 };
 
+unsigned long usLast = 0;
+CommandQueue cmdQueue;
+MotionLogic mtrLeft { PIN_MTR1_PWM };
+MotionLogic mtrRight { PIN_MTR2_PWM };
+
 void setMotorDirection()
 {
     if (mtrLeft.isForward()) {
@@ -442,11 +447,6 @@ void updateDisplay(unsigned long time)
     display.setCursor(6, 3);
     display.print((float)time / 1000000.0, 3);
 }
-
-unsigned long usLast = 0;
-CommandQueue cmdQueue;
-MotionLogic mtrLeft { PIN_MTR1_PWM };
-MotionLogic mtrRight { PIN_MTR2_PWM };
 
 }
 
