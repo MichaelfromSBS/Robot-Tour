@@ -1,5 +1,25 @@
-// 7.229s, 3.511s----->gap between two movement: 0.207s
-// time of 
+// Calculation for a single turn:
+// t_acc = V / A
+// d_acc = A * t_acc^2 (accel + decel distance)
+// d_tot = PULSES_90_DEG [* 2] (depending on 90 or 180 degrees turn)
+// d_const = d_tot - d_acc
+// t_const = d_const / V
+// t_single_turn = t_acc * 2 + t_const
+//
+// Then solve for moving speed (v unknown):
+// d_tot = d_tot_mm * PULSES_PER_MM
+// t_acc = v / A
+// d_acc = A * t_acc^2 = v^2 / A (accel + decel distance)
+// d_const = d_i - d_acc = d_i - v^2 / A
+// t_const = d_const / v
+//         = (d_i - v^2 / A) / v
+//         = d_i / v - v / A
+// t_move = (t_acc * 2 + t_const) + ...
+//        = 2 * v * N / A + d_tot / v - v * N / A
+//        = d_tot / v + v * N / A <─┐
+//                                  |
+// t_move = t_tot - t_turn <────────┘
+
 #include <LiquidCrystal_I2C.h>
 
 #define PIN_MTR1_ENCA    2
@@ -12,10 +32,11 @@
 #define PIN_MTR1_PWM     9
 #define PIN_MTR2_PWM     10
 
-#define PULSES_PER_MM         2.278
-#define ENCODER_COUNTS_90_DEG 313
-#define SPEED_MIN             120
-#define MAX_COMMANDS          60
+#define PULSES_PER_MM             2.278
+#define PULSES_90_DEG             313
+#define SPEED_MIN                 120
+#define MAX_COMMANDS              60
+#define MOTION_UPDATE_INTERVAL_US 30000
 
 #define ASSERT(e)                              \
     if (!(e)) {                                \
@@ -87,76 +108,18 @@ public:
     void load()
     {
         clear();
-        add(VEHICLE_START_WAIT); // do not change this line - waits for start pushbutton
-        add(VEHICLE_START);      // do not change this line
+        add(VEHICLE_START_WAIT); // Do not change
+        add(VEHICLE_START);      // Do not change
 
-        // Define robot movement speeds
-        // Speed is encoder pulses per second.
-        // There is a maximum speed.  Testing will be required to learn this speed.
-        //    SETTING THE SPEEDS ABOVE THE MOTOR'S MAXIMUM SPEED WILL CAUSE STRANGE RESULTS
-        add(VEHICLE_SET_MOVE_SPEED, 500); // Speed used for forward movements
-        add(VEHICLE_SET_TURN_SPEED, 200); // Speed used for left or right turns
-        add(VEHICLE_SET_ACCEL, 400);      // smaller is softer   larger is quicker and less accurate moves
+        add(VEHICLE_SET_MOVE_SPEED, 500); // Calculate
+        add(VEHICLE_SET_TURN_SPEED, 200); // Keep constant; use low turn speed for consistency
+        add(VEHICLE_SET_ACCEL, 400);      // Keep constant
 
-        // Example list of robot movements
-        // This block is modified for each tournament
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_LEFT);
-        // // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_LEFT);
-        // // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_LEFT);
-        // // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_LEFT);
-        // ---------------------------------------------EXAMPLE1--------------------------------------------------------------
-        add(VEHICLE_FORWARD,325);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,1000);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,425);
-        // --------------------------------------------------------EXAMPLE1------------------------------------------------------
-        // add(VEHICLE_FORWARD, 325);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_FORWARD, 1000);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_LEFT);
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_180);
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD, 500);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD, 1000);
-        // add(VEHICLE_TURN_RIGHT);
-        // add(VEHICLE_FORWARD, 925);
-        // -------------------------------------------------------------------------------------
-        // add(VEHICLE_FORWARD, 900);
-        // This MUST be the last command.
-        add(VEHICLE_FINISHED);
+        // Distance between dowel and center of robot: 75mm
+        // Define robot movement below
+        // add(...);
+
+        add(VEHICLE_FINISHED); // This MUST be the last command
     }
 
 private:
@@ -205,7 +168,7 @@ public:
         float distAccel = (float)speedTarget / 2.0 * tAccel;
         float distDecel = (float)speedTarget / 2.0 * tDecel;
         float distAtSpeed = (float)positionTarget - distAccel - distDecel;
-#if 0
+#if 1
         if (distAtSpeed < 0.0) {
             // Serial.println("Motion - Short move logic");
             distAccel = (float)positionTarget / 2.0;
@@ -253,7 +216,7 @@ public:
         timerUpdate += usecElapsed;
 
         int speedActual; // p/s
-        if (timerUpdate >= 30000) {
+        if (timerUpdate >= MOTION_UPDATE_INTERVAL_US) {
             auto delta = countEncoder - countEncoderLast;
             speedActual = delta * 1000000 / timerUpdate;
             countEncoderLast = countEncoder;
@@ -547,8 +510,8 @@ void loop()
         break;
     case VEHICLE_TURN_RIGHT:
         if (newCmd) {
-            mtrLeft.startMove(ENCODER_COUNTS_90_DEG, speedTurn);
-            mtrRight.startMove(ENCODER_COUNTS_90_DEG, -speedTurn);
+            mtrLeft.startMove(PULSES_90_DEG, speedTurn);
+            mtrRight.startMove(PULSES_90_DEG, -speedTurn);
             setMotorDirection();
         }
 
@@ -559,8 +522,8 @@ void loop()
         break;
     case VEHICLE_TURN_LEFT:
         if (newCmd) {
-            mtrLeft.startMove(ENCODER_COUNTS_90_DEG, -speedTurn);
-            mtrRight.startMove(ENCODER_COUNTS_90_DEG, speedTurn);
+            mtrLeft.startMove(PULSES_90_DEG, -speedTurn);
+            mtrRight.startMove(PULSES_90_DEG, speedTurn);
             setMotorDirection();
         }
 
@@ -571,8 +534,8 @@ void loop()
         break;
     case VEHICLE_TURN_180:
         if (newCmd) {
-            mtrLeft.startMove(ENCODER_COUNTS_90_DEG * 2, speedTurn);
-            mtrRight.startMove(ENCODER_COUNTS_90_DEG * 2, -speedTurn);
+            mtrLeft.startMove(PULSES_90_DEG * 2, speedTurn);
+            mtrRight.startMove(PULSES_90_DEG * 2, -speedTurn);
             setMotorDirection();
         }
 
