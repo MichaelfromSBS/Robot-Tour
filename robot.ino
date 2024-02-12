@@ -111,13 +111,33 @@ public:
         add(VEHICLE_START_WAIT); // Do not change
         add(VEHICLE_START);      // Do not change
 
-        add(VEHICLE_SET_MOVE_SPEED, 500); // Calculate
+        add(VEHICLE_SET_MOVE_SPEED, 300); // Calculate
         add(VEHICLE_SET_TURN_SPEED, 200); // Keep constant; use low turn speed for consistency
         add(VEHICLE_SET_ACCEL, 400);      // Keep constant
 
         // Distance between dowel and center of robot: 75mm
         // Define robot movement below
         // add(...);
+
+        add(VEHICLE_FORWARD,325);
+        add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,500);
+        add(VEHICLE_TURN_LEFT);
+        add(VEHICLE_FORWARD,1000);
+        add(VEHICLE_TURN_LEFT);
+                add(VEHICLE_FORWARD,500);
+                add(VEHICLE_TURN_RIGHT);
+        add(VEHICLE_FORWARD,500);
+                add(VEHICLE_TURN_LEFT);
+                        add(VEHICLE_FORWARD,1000);
+                                add(VEHICLE_TURN_LEFT);
+                                        add(VEHICLE_FORWARD,925);
+
+
+
+
+
+
 
         add(VEHICLE_FINISHED); // This MUST be the last command
     }
