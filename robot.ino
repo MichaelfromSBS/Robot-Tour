@@ -20,6 +20,7 @@
 //                                  |
 // t_move = t_tot - t_turn <────────┘
 
+#include <Adafruit_BNO055.h>
 #include <LiquidCrystal_I2C.h>
 
 #define PIN_MTR1_ENCA    2
@@ -38,20 +39,241 @@
 #define MAX_COMMANDS              60
 #define MOTION_UPDATE_INTERVAL_US 30000
 
-#define ASSERT(e)                              \
-    if (!(e)) {                                \
-        display.clear();                       \
-        display.setCursor(0, 0);               \
-        display.print(F("ASSERTION FAILED:")); \
-        display.setCursor(0, 1);               \
-        display.print(F(#e));                  \
-        display.setCursor(0, 2);               \
-        display.print(__LINE__);               \
-        abort();                               \
-    }
+#if 0
+    #define ASSERT(e)                              \
+        if (!(e)) {                                \
+            display.clear();                       \
+            display.setCursor(0, 0);               \
+            display.print(F("ASSERTION FAILED:")); \
+            display.setCursor(0, 1);               \
+            display.print(F(#e));                  \
+            display.setCursor(0, 2);               \
+            display.print(__LINE__);               \
+            abort();                               \
+        }
+#else
+    #define ASSERT(e) \
+        if (!(e))     \
+            abort();
+#endif
 
 namespace {
 
+constexpr size_t NUM_SEGMENTS = 1;
+
+struct Pose {
+    double x = 0,
+           y = 0,
+           heading = 0;
+};
+
+struct Segment {
+    enum class Type {
+        Straight,
+        Turn
+    } type;
+};
+
+using SegmentSequence = Segment[NUM_SEGMENTS];
+
+struct DriveSignal {
+};
+
+class Localizer {
+public:
+    Localizer()
+    {
+        pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
+        pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
+
+        attachInterrupt(
+            digitalPinToInterrupt(PIN_MTR1_ENCA), [] { ++s_encoder_count_left; }, RISING);
+
+        attachInterrupt(
+            digitalPinToInterrupt(PIN_MTR2_ENCA), [] { ++s_encoder_count_right; }, RISING);
+
+        auto success = m_imu.begin();
+        ASSERT(success);
+        m_imu.setExtCrystalUse(true);
+    }
+
+    void update()
+    {
+        noInterrupts();
+        auto count_left = s_encoder_count_left;
+        auto count_right = s_encoder_count_right;
+        interrupts();
+
+        auto position_left = ticks_to_mm(count_left);
+        auto position_right = ticks_to_mm(count_right);
+        auto heading = m_imu.getVector(Adafruit_BNO055::VECTOR_EULER).z();
+
+        if (m_has_previous_positions) {
+            auto delta_left = position_left - m_previous_position_left;
+            auto delta_right = position_right - m_previous_position_right;
+
+            auto distance = (delta_left + delta_right) / 2;
+            auto dx = distance * cos(m_pose_estimate.heading);
+            auto dy = distance * sin(m_pose_estimate.heading);
+
+            m_pose_estimate.x += dx;
+            m_pose_estimate.y += dy;
+            m_pose_estimate.heading = heading;
+        } else {
+            m_has_previous_positions = true;
+        }
+
+        m_previous_position_left = position_left;
+        m_previous_position_right = position_right;
+    }
+
+    const Pose& get_pose_estimate()
+    {
+        return m_pose_estimate;
+    }
+
+private:
+    double ticks_to_mm(unsigned long ticks)
+    {
+        return WHEEL_RADIUS * TWO_PI * GEAR_RATIO * ticks / TICKS_PER_REV;
+    }
+
+    static constexpr double WHEEL_RADIUS = 37.5,
+                            GEAR_RATIO = 1,
+                            TICKS_PER_REV = 540;
+    static inline volatile unsigned long s_encoder_count_left = 0,
+                                         s_encoder_count_right = 0;
+    Adafruit_BNO055 m_imu;
+    Pose m_pose_estimate;
+    double m_previous_position_left = 0,
+           m_previous_position_right = 0;
+    bool m_has_previous_positions = false;
+};
+
+class Drive {
+public:
+    Drive()
+    {
+        pinMode(PIN_MTR1_PWM, OUTPUT);
+        pinMode(PIN_MTR2_PWM, OUTPUT);
+
+        pinMode(PIN_MTR1_DIR_FWD, OUTPUT);
+        pinMode(PIN_MTR1_DIR_REV, OUTPUT);
+        pinMode(PIN_MTR2_DIR_FWD, OUTPUT);
+        pinMode(PIN_MTR2_DIR_REV, OUTPUT);
+
+        digitalWrite(PIN_MTR1_DIR_FWD, LOW);
+        digitalWrite(PIN_MTR1_DIR_REV, LOW);
+        digitalWrite(PIN_MTR2_DIR_FWD, LOW);
+        digitalWrite(PIN_MTR2_DIR_REV, LOW);
+    }
+
+    void follow_segment_sequence(const SegmentSequence& seq)
+    {
+        m_current_sequence = &seq;
+        m_current_segment_index = 0;
+        m_last_segment_index = -1;
+    }
+
+    void update()
+    {
+        m_localizer.update();
+        auto drive_signal = update_drive();
+        set_drive_signal(drive_signal);
+    }
+
+    const Pose& get_pose_estimate()
+    {
+        return m_localizer.get_pose_estimate();
+    }
+
+private:
+    DriveSignal update_drive()
+    {
+        if (m_current_sequence) {
+            if (m_current_segment_index >= NUM_SEGMENTS) {
+                m_current_sequence = nullptr;
+                return {};
+            }
+
+            auto is_new_segment = m_current_segment_index != m_last_segment_index;
+            if (is_new_segment) {
+                // Start time
+                m_last_segment_index = m_current_segment_index;
+            }
+            const auto& current_segment = (*m_current_sequence)[m_current_segment_index];
+            switch (current_segment.type) {
+            case Segment::Type::Straight:
+                break;
+            case Segment::Type::Turn:
+                break;
+            default:
+                ASSERT(!"Unreachable");
+            }
+        }
+        return {};
+        // return nullptr???
+    }
+
+    void set_drive_signal(const DriveSignal& drive_signal)
+    {
+        (void)drive_signal;
+    }
+
+    void set_motor_powers(double left, double right)
+    {
+        if (left >= 0) {
+            digitalWrite(PIN_MTR1_DIR_FWD, HIGH);
+            digitalWrite(PIN_MTR1_DIR_REV, LOW);
+        } else {
+            digitalWrite(PIN_MTR1_DIR_FWD, LOW);
+            digitalWrite(PIN_MTR1_DIR_REV, HIGH);
+        }
+
+        if (right >= 0) {
+            digitalWrite(PIN_MTR2_DIR_FWD, HIGH);
+            digitalWrite(PIN_MTR2_DIR_REV, LOW);
+        } else {
+            digitalWrite(PIN_MTR2_DIR_FWD, LOW);
+            digitalWrite(PIN_MTR2_DIR_REV, HIGH);
+        }
+
+        analogWrite(PIN_MTR1_PWM, left * 255);
+        analogWrite(PIN_MTR2_PWM, right * 255);
+    }
+
+    Localizer m_localizer;
+    const SegmentSequence* m_current_sequence = nullptr;
+    size_t m_current_segment_index = 0;
+    size_t m_last_segment_index = -1;
+};
+
+Drive s_drive;
+
+}
+
+void setup()
+{
+    Serial.begin(115200);
+}
+
+void loop()
+{
+    static int counter = 0;
+
+    s_drive.update();
+    if (++counter >= 100) {
+        const auto& pose = s_drive.get_pose_estimate();
+        Serial.print(pose.x);
+        Serial.print(", ");
+        Serial.print(pose.y);
+        Serial.print(", ");
+        Serial.println(pose.heading);
+        counter = 0;
+    }
+}
+
+#if 0
 enum {
     VEHICLE_START_WAIT = 1,
     VEHICLE_START,
@@ -168,7 +390,7 @@ public:
         float distAccel = (float)speedTarget / 2.0 * tAccel;
         float distDecel = (float)speedTarget / 2.0 * tDecel;
         float distAtSpeed = (float)positionTarget - distAccel - distDecel;
-#if 1
+    #if 1
         if (distAtSpeed < 0.0) {
             // Serial.println("Motion - Short move logic");
             distAccel = (float)positionTarget / 2.0;
@@ -178,9 +400,9 @@ public:
             tAccel = sqrt(distAccel * 2.0 / accelRate);
             tDecel = sqrt(distDecel * 2.0 / decelRate);
         }
-#else
+    #else
         ASSERT(distAtSpeed > 0);
-#endif
+    #endif
         float tAtSpeed = distAtSpeed / speedTarget;
 
         timeAtSpeed = tAccel * 1000000;
@@ -338,27 +560,6 @@ void setMotorDirection()
 void initPins()
 {
     pinMode(PIN_PB_START, INPUT_PULLUP);
-
-    pinMode(PIN_MTR1_PWM, OUTPUT);
-    pinMode(PIN_MTR2_PWM, OUTPUT);
-
-    pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
-    pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
-
-    attachInterrupt(
-        digitalPinToInterrupt(PIN_MTR1_ENCA), [] { mtrLeft.incrEncoder(); }, RISING);
-
-    attachInterrupt(
-        digitalPinToInterrupt(PIN_MTR2_ENCA), [] { mtrRight.incrEncoder(); }, RISING);
-
-    pinMode(PIN_MTR1_DIR_FWD, OUTPUT);
-    pinMode(PIN_MTR1_DIR_REV, OUTPUT);
-    pinMode(PIN_MTR2_DIR_FWD, OUTPUT);
-    pinMode(PIN_MTR2_DIR_REV, OUTPUT);
-    digitalWrite(PIN_MTR1_DIR_FWD, LOW);
-    digitalWrite(PIN_MTR1_DIR_REV, LOW);
-    digitalWrite(PIN_MTR2_DIR_FWD, LOW);
-    digitalWrite(PIN_MTR2_DIR_REV, LOW);
 }
 
 void initDisplay()
@@ -577,3 +778,4 @@ void loop()
         ASSERT(!"Unreachable");
     }
 }
+#endif
