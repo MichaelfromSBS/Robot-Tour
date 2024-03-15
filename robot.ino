@@ -18,7 +18,7 @@
 //        = 2 * v * N / A + d_tot / v - v * N / A
 //        = d_tot / v + v * N / A <─┐
 //                                  |
-// t_move = t_tot - t_turn <────────┘   
+// t_move = t_tot - t_turn <────────┘
 
 #include <LiquidCrystal_I2C.h>
 
@@ -53,17 +53,17 @@
 namespace {
 
 enum {
-    VEHICLE_START_WAIT = 1,
-    VEHICLE_START,
-    VEHICLE_FORWARD,
-    VEHICLE_TURN_RIGHT,
-    VEHICLE_TURN_LEFT,
-    VEHICLE_TURN_180,
-    VEHICLE_SET_MOVE_SPEED,
-    VEHICLE_SET_TURN_SPEED,
-    VEHICLE_SET_ACCEL,
-    VEHICLE_FINISHED,
-    VEHICLE_ABORT
+    START_WAIT = 1,
+    START,
+    FORWARD,
+    TURN_RIGHT,
+    TURN_LEFT,
+    TURN_180,
+    SET_MOVE_SPEED,
+    SET_TURN_SPEED,
+    SET_ACCEL,
+    FINISHED,
+    ABORT
 };
 
 LiquidCrystal_I2C display { 0x27, 20, 4 };
@@ -108,38 +108,18 @@ public:
     void load()
     {
         clear();
-        add(VEHICLE_START_WAIT); // Do not change
-        add(VEHICLE_START);      // Do not change
+        add(START_WAIT); // Do not change
+        add(START);      // Do not change
 
-        add(VEHICLE_SET_MOVE_SPEED, 300); // Calculate
-        add(VEHICLE_SET_TURN_SPEED, 200); // Keep constant; use low turn speed for consistency
-        add(VEHICLE_SET_ACCEL, 400);      // Keep constant
+        add(SET_MOVE_SPEED, 300); // Calculate
+        add(SET_TURN_SPEED, 200); // Keep constant; use low turn speed for consistency
+        add(SET_ACCEL, 400);      // Keep constant
 
         // Distance between dowel and center of robot: 75mm
         // Define robot movement below
         // add(...);
 
-        add(VEHICLE_FORWARD,325);
-        add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,500);
-        add(VEHICLE_TURN_LEFT);
-        add(VEHICLE_FORWARD,1000);
-        add(VEHICLE_TURN_LEFT);
-                add(VEHICLE_FORWARD,500);
-                add(VEHICLE_TURN_RIGHT);
-        add(VEHICLE_FORWARD,500);
-                add(VEHICLE_TURN_LEFT);
-                        add(VEHICLE_FORWARD,1000);
-                                add(VEHICLE_TURN_LEFT);
-                                        add(VEHICLE_FORWARD,925);
-
-
-
-
-
-
-
-        add(VEHICLE_FINISHED); // This MUST be the last command
+        add(FINISHED); // This MUST be the last command
     }
 
 private:
@@ -402,28 +382,28 @@ void updateDisplay(unsigned long time)
     if (lastCmd != cmd) {
         display.setCursor(5, 0);
         switch (cmd) {
-        case VEHICLE_START_WAIT:
+        case START_WAIT:
             display.print(F("WAIT START  "));
             break;
-        case VEHICLE_START:
+        case START:
             display.print(F("WAIT RELEASE"));
             break;
-        case VEHICLE_FORWARD:
+        case FORWARD:
             display.print(F("FORWARD     "));
             break;
-        case VEHICLE_TURN_RIGHT:
+        case TURN_RIGHT:
             display.print(F("TURN RIGHT  "));
             break;
-        case VEHICLE_TURN_LEFT:
+        case TURN_LEFT:
             display.print(F("TURN LEFT   "));
             break;
-        case VEHICLE_TURN_180:
+        case TURN_180:
             display.print(F("TURN 180    "));
             break;
-        case VEHICLE_FINISHED:
+        case FINISHED:
             display.print(F("FINISHED    "));
             break;
-        case VEHICLE_ABORT:
+        case ABORT:
             display.print(F("ABORT       "));
             break;
         default:
@@ -492,10 +472,10 @@ void loop()
     auto newCmd = cmdQueue.firstScan();
     auto cmd = cmdQueue.currentCmd();
 
-    if (cmd > VEHICLE_START && cmd < VEHICLE_ABORT) {
+    if (cmd > START && cmd < ABORT) {
         if (timerPBStartOn > 100000) {
             cmdQueue.clear();
-            cmdQueue.add(VEHICLE_ABORT);
+            cmdQueue.add(ABORT);
             return;
         }
     }
@@ -504,18 +484,18 @@ void loop()
         timerRunTime += usecElapsed;
 
     switch (cmd) {
-    case VEHICLE_START_WAIT:
+    case START_WAIT:
         if (timerPBStartOn > 100000)
             cmdQueue.next();
         break;
-    case VEHICLE_START:
+    case START:
         if (timerPBStartOff > 100000) {
             cmdQueue.next();
             timerRunning = true;
             timerRunTime = 0;
         }
         break;
-    case VEHICLE_FORWARD:
+    case FORWARD:
         if (newCmd) {
             long distance = cmdQueue.currentParam() * PULSES_PER_MM;
             mtrLeft.startMove(distance, speedFwd);
@@ -528,7 +508,7 @@ void loop()
             cmdQueue.next();
         }
         break;
-    case VEHICLE_TURN_RIGHT:
+    case TURN_RIGHT:
         if (newCmd) {
             mtrLeft.startMove(PULSES_90_DEG, speedTurn);
             mtrRight.startMove(PULSES_90_DEG, -speedTurn);
@@ -540,7 +520,7 @@ void loop()
             cmdQueue.next();
         }
         break;
-    case VEHICLE_TURN_LEFT:
+    case TURN_LEFT:
         if (newCmd) {
             mtrLeft.startMove(PULSES_90_DEG, -speedTurn);
             mtrRight.startMove(PULSES_90_DEG, speedTurn);
@@ -552,7 +532,7 @@ void loop()
             cmdQueue.next();
         }
         break;
-    case VEHICLE_TURN_180:
+    case TURN_180:
         if (newCmd) {
             mtrLeft.startMove(PULSES_90_DEG * 2, speedTurn);
             mtrRight.startMove(PULSES_90_DEG * 2, -speedTurn);
@@ -564,20 +544,20 @@ void loop()
             cmdQueue.next();
         }
         break;
-    case VEHICLE_SET_MOVE_SPEED:
+    case SET_MOVE_SPEED:
         speedFwd = cmdQueue.currentParam();
         cmdQueue.next();
         break;
-    case VEHICLE_SET_TURN_SPEED:
+    case SET_TURN_SPEED:
         speedTurn = cmdQueue.currentParam();
         cmdQueue.next();
         break;
-    case VEHICLE_SET_ACCEL:
+    case SET_ACCEL:
         mtrLeft.setAccel(cmdQueue.currentParam());
         mtrRight.setAccel(cmdQueue.currentParam());
         cmdQueue.next();
         break;
-    case VEHICLE_FINISHED:
+    case FINISHED:
         if (newCmd) {
             mtrLeft.stop();
             mtrRight.stop();
@@ -585,7 +565,7 @@ void loop()
             timerRunning = false;
         }
         break;
-    case VEHICLE_ABORT:
+    case ABORT:
         mtrLeft.stop();
         mtrRight.stop();
         setMotorDirection();
