@@ -18,7 +18,7 @@
 //        = 2 * v * N / A + d_tot / v - v * N / A
 //        = d_tot / v + v * N / A <─┐
 //                                  |
-// t_move = t_tot - t_turn <────────┘
+// t_move = t_tot - t_turn <────────┘   
 
 #include <LiquidCrystal_I2C.h>
 
