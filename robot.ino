@@ -59,6 +59,8 @@
 
 namespace {
 
+// LiquidCrystal_I2C display { 0x27, 20, 4 };
+
 constexpr size_t NUM_SEGMENTS = 1;
 
 struct Pose {
@@ -70,8 +72,12 @@ struct Pose {
 struct Segment {
     enum class Type {
         Straight,
-        Turn
-    } type;
+        Turn90,
+        Turn180
+    };
+
+    Type type;
+    double distance;
 };
 
 using SegmentSequence = Segment[NUM_SEGMENTS];
@@ -79,9 +85,27 @@ using SegmentSequence = Segment[NUM_SEGMENTS];
 struct DriveSignal {
 };
 
+struct PIDCoefficients {
+    double p, i, d;
+};
+
+// use two pids for pose error -> velocity (linear and angular)
+// use existing one for velocity -> wheel speeds
+
+class PIDController {
+public:
+    PIDController(PIDCoefficients coeffs)
+        : m_coeffs { coeffs }
+    {
+    }
+
+private:
+    PIDCoefficients m_coeffs;
+};
+
 class Localizer {
 public:
-    Localizer()
+    void init()
     {
         pinMode(PIN_MTR1_ENCA, INPUT_PULLUP);
         pinMode(PIN_MTR2_ENCA, INPUT_PULLUP);
@@ -97,6 +121,12 @@ public:
         m_imu.setExtCrystalUse(true);
     }
 
+    void reset()
+    {
+        m_pose_estimate = {};
+        m_heading_offset = -get_raw_heading();
+    }
+
     void update()
     {
         noInterrupts();
@@ -104,27 +134,40 @@ public:
         auto count_right = s_encoder_count_right;
         interrupts();
 
+        auto time = static_cast<double>(micros()) / 1000000;
+
         auto position_left = ticks_to_mm(count_left);
         auto position_right = ticks_to_mm(count_right);
-        auto heading = m_imu.getVector(Adafruit_BNO055::VECTOR_EULER).z();
+        auto heading = get_raw_heading() + m_heading_offset;
 
-        if (m_has_previous_positions) {
+        if (!m_is_first_update) {
             auto delta_left = position_left - m_previous_position_left;
             auto delta_right = position_right - m_previous_position_right;
+            auto delta_time = time - m_previous_time;
 
-            auto distance = (delta_left + delta_right) / 2;
-            auto dx = distance * cos(m_pose_estimate.heading);
-            auto dy = distance * sin(m_pose_estimate.heading);
+            auto wheel_to_field = [heading = m_pose_estimate.heading](double left, double right, double& x, double& y) {
+                auto avg = (left + right) / 2;
+                x = avg * cos(heading);
+                y = avg * sin(heading);
+            };
 
+            double dx, dy;
+            wheel_to_field(delta_left, delta_right, dx, dy);
             m_pose_estimate.x += dx;
             m_pose_estimate.y += dy;
             m_pose_estimate.heading = heading;
+
+            auto velocity_left = delta_left / delta_time;
+            auto velocity_right = delta_right / delta_time;
+            wheel_to_field(velocity_left, velocity_right, m_velocity_estimate.x, m_velocity_estimate.y);
+            m_velocity_estimate.heading = get_angular_velocity();
         } else {
-            m_has_previous_positions = true;
+            m_is_first_update = false;
         }
 
         m_previous_position_left = position_left;
         m_previous_position_right = position_right;
+        m_previous_time = time;
     }
 
     const Pose& get_pose_estimate()
@@ -132,7 +175,27 @@ public:
         return m_pose_estimate;
     }
 
+    const Pose& get_velocity_estimate()
+    {
+        return m_velocity_estimate;
+    }
+
+    auto get_euler()
+    {
+        return m_imu.getVector(Adafruit_BNO055::VECTOR_EULER);
+    }
+
 private:
+    double get_raw_heading()
+    {
+        return m_imu.getVector(Adafruit_BNO055::VECTOR_EULER).z();
+    }
+
+    double get_angular_velocity()
+    {
+        return m_imu.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE).z();
+    }
+
     double ticks_to_mm(unsigned long ticks)
     {
         return WHEEL_RADIUS * TWO_PI * GEAR_RATIO * ticks / TICKS_PER_REV;
@@ -144,10 +207,13 @@ private:
     static inline volatile unsigned long s_encoder_count_left = 0,
                                          s_encoder_count_right = 0;
     Adafruit_BNO055 m_imu;
-    Pose m_pose_estimate;
+    Pose m_pose_estimate,
+        m_velocity_estimate;
     double m_previous_position_left = 0,
            m_previous_position_right = 0;
-    bool m_has_previous_positions = false;
+    double m_previous_time = 0;
+    bool m_is_first_update = true;
+    double m_heading_offset = 0;
 };
 
 class Drive {
@@ -178,8 +244,10 @@ public:
     void update()
     {
         m_localizer.update();
-        auto drive_signal = update_drive();
-        set_drive_signal(drive_signal);
+        if (m_current_sequence) {
+            auto drive_signal = update_drive();
+            set_drive_signal(drive_signal);
+        }
     }
 
     const Pose& get_pose_estimate()
@@ -190,29 +258,31 @@ public:
 private:
     DriveSignal update_drive()
     {
-        if (m_current_sequence) {
-            if (m_current_segment_index >= NUM_SEGMENTS) {
-                m_current_sequence = nullptr;
-                return {};
-            }
-
-            auto is_new_segment = m_current_segment_index != m_last_segment_index;
-            if (is_new_segment) {
-                // Start time
-                m_last_segment_index = m_current_segment_index;
-            }
-            const auto& current_segment = (*m_current_sequence)[m_current_segment_index];
-            switch (current_segment.type) {
-            case Segment::Type::Straight:
-                break;
-            case Segment::Type::Turn:
-                break;
-            default:
-                ASSERT(!"Unreachable");
-            }
+        if (m_current_segment_index >= NUM_SEGMENTS) {
+            m_current_sequence = nullptr;
+            return {};
         }
-        return {};
-        // return nullptr???
+
+        auto time = static_cast<double>(micros()) / 1000000;
+        auto is_new_segment = m_current_segment_index != m_last_segment_index;
+        if (is_new_segment) {
+            m_current_segment_start_time = time;
+            m_last_segment_index = m_current_segment_index;
+        }
+
+        auto delta_time = time - m_current_segment_start_time;
+
+        const auto& current_segment = (*m_current_sequence)[m_current_segment_index];
+        switch (current_segment.type) {
+        case Segment::Type::Straight:
+            break;
+        case Segment::Type::Turn90:
+            break;
+        case Segment::Type::Turn180:
+            break;
+        default:
+            ASSERT(!"Unreachable");
+        }
     }
 
     void set_drive_signal(const DriveSignal& drive_signal)
@@ -246,34 +316,9 @@ private:
     const SegmentSequence* m_current_sequence = nullptr;
     size_t m_current_segment_index = 0;
     size_t m_last_segment_index = -1;
+    double m_current_segment_start_time = 0;
 };
 
-Drive s_drive;
-
-}
-
-void setup()
-{
-    Serial.begin(115200);
-}
-
-void loop()
-{
-    static int counter = 0;
-
-    s_drive.update();
-    if (++counter >= 100) {
-        const auto& pose = s_drive.get_pose_estimate();
-        Serial.print(pose.x);
-        Serial.print(", ");
-        Serial.print(pose.y);
-        Serial.print(", ");
-        Serial.println(pose.heading);
-        counter = 0;
-    }
-}
-
-#if 0
 enum {
     VEHICLE_START_WAIT = 1,
     VEHICLE_START,
@@ -287,8 +332,6 @@ enum {
     VEHICLE_FINISHED,
     VEHICLE_ABORT
 };
-
-LiquidCrystal_I2C display { 0x27, 20, 4 };
 
 class CommandQueue {
 public:
@@ -390,7 +433,7 @@ public:
         float distAccel = (float)speedTarget / 2.0 * tAccel;
         float distDecel = (float)speedTarget / 2.0 * tDecel;
         float distAtSpeed = (float)positionTarget - distAccel - distDecel;
-    #if 1
+#if 1
         if (distAtSpeed < 0.0) {
             // Serial.println("Motion - Short move logic");
             distAccel = (float)positionTarget / 2.0;
@@ -400,9 +443,9 @@ public:
             tAccel = sqrt(distAccel * 2.0 / accelRate);
             tDecel = sqrt(distDecel * 2.0 / decelRate);
         }
-    #else
+#else
         ASSERT(distAtSpeed > 0);
-    #endif
+#endif
         float tAtSpeed = distAtSpeed / speedTarget;
 
         timeAtSpeed = tAccel * 1000000;
@@ -564,6 +607,7 @@ void initPins()
 
 void initDisplay()
 {
+#if 0
     display.init();
     display.backlight();
 
@@ -573,10 +617,12 @@ void initDisplay()
 
     display.setCursor(0, 3);
     display.print(F("Time:"));
+#endif
 }
 
 void updateDisplay(unsigned long time)
 {
+#if 0
     static int lastCmd = 0;
 
     auto cmd = cmdQueue.currentCmd();
@@ -615,10 +661,44 @@ void updateDisplay(unsigned long time)
 
     display.setCursor(6, 3);
     display.print((float)time / 1000000.0, 3);
+#endif
 }
 
+Localizer s_localizer;
 }
 
+#if 1
+void setup()
+{
+    Serial.begin(115200);
+    s_localizer.init();
+}
+
+void loop()
+{
+    static int counter = 0;
+
+    s_localizer.update();
+    if (++counter >= 100) {
+        auto pose = s_localizer.get_euler();
+        const auto& velocity = s_localizer.get_velocity_estimate();
+        Serial.print(pose.x());
+        Serial.print(", ");
+        Serial.print(pose.y());
+        Serial.print(", ");
+        Serial.print(pose.z());
+        Serial.print("; ");
+        Serial.print(velocity.x);
+        Serial.print(", ");
+        Serial.print(velocity.y);
+        Serial.print(", ");
+        Serial.println(velocity.heading);
+        counter = 0;
+    }
+
+    delay(100);
+}
+#else
 void setup()
 {
     // Only uncomment one motor at a time to use the Serial Plotter function to tune the PID loop
